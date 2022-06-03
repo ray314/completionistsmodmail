@@ -1,1 +1,4 @@
 node_modules/**
+data/**
+testing-config.json
+test-auth.json
