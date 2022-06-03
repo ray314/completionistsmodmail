@@ -5,8 +5,9 @@
 // .resolve [message] : MOD/GUILD_REPLY : resolves the replied ticket and sends the user a message through dm anonymously
 // .edit : DM : allows the user to edit their ticket
 // .reopen : DM : re opens the last ticket issued by the user
-const { MessageEmbed, MessageActionRow, MessageSelectMenu } = require('discord.js');
+
 const config = require('../config.json');
+const src = require('./source.js');
 
 function Hooks(client) {
     client.on('messageCreate', message => {
@@ -48,14 +49,50 @@ function Hooks(client) {
 function sendSupportContact (message) {
     isValid(client, message).then(valid => {
         if (!valid) return;
+        client.channels.fetch(config.SupportChannelID).then(channel => {
+            if (!channel) return;
+            return channel.send({embeds:[src.embeds.contactEmbed],components:[src.actions.contactAction]}).then(contact => {
+                if (contact) {
+                    message.react('✅');
+                } else {
+                    message.react('❌');
+                }
+            });
+        }).catch(error => {
+            message.react('❌');
+        });
     });
 }
 
 function updateSupportContact (message) {
     isValid(client, message).then(valid => {
         if (!valid) return;
-
-    })
+        client.channels.fetch(config.SupportChannelID).then(channel => { // Fetch support chanmel
+            if (!channel) return message.react('❌');
+            channel.message.fetch({limit:100}).then(messages => { // Fetch all messages
+                if (!messages) return message.react('❌');
+                for (const channel_message of messages.toJSON()) { // Iterate all messages
+                    if (!channel_message.components) continue;
+                    for (message_component of channel_message.components) { // Iterate all components
+                        if (message_component.components.length > 0 && message_component.components[0].customId == 'RequestTicket') { // Check if component matches requestTicket
+                            return channel_message.edit({embeds:[src.embeds.contactEmbed],components:[src.actions.contactAction]}).then(edited => { // Update message configuration
+                                if (contact) {
+                                    message.react('✅');
+                                } else {
+                                    message.react('❌');
+                                }
+                            }); 
+                        }
+                    }
+                }
+                message.react('❌');
+            }).catch(error => {
+                message.react('❌');
+            });
+        }).catch(error => {
+            message.react('❌');
+        });
+    });
 }
 
 function resolveTicket (message, status) {
