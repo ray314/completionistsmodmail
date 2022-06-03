@@ -1,5 +1,6 @@
 {
     "GuildID": "925159676193173534",
+    "SupportChannelID": "SUPPORT_ID",
     "TicketChannelID": "980753342533894164",
     "ModeratorRoleIDs": [
         "925164302082662460",
