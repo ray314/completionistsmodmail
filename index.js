@@ -1,5 +1,6 @@
 const { Intents, Client } = require("discord.js");
 const { Hooks } = require('./modules/hooks.js');
+const db = require('./modules/database.js');
 const auth = require('./auth.json');
 const config = require('./config.json');
 

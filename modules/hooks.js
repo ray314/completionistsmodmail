@@ -1,22 +1,9 @@
-// .sendcontact : MOD/GUILD/DM : resends the contact embed
-// .updatecontact : MOD/GUILD/DM : updates the contact embed to current configuration
-// .accept [message] : MOD/GUILD_REPLY : accepts the replied ticket and sends the user a message through dm anonymously
-// .deny [message] : MOD/GUILD_REPLY : denies the replied ticket and sends the user a message through dm anonymously
-// .resolve [message] : MOD/GUILD_REPLY : resolves the replied ticket and sends the user a message through dm anonymously
-// .edit : DM : allows the user to edit their ticket
-// .reopen : DM : re opens the last ticket issued by the user
-
 const config = require('../config.json');
 const src = require('./source.js');
+const db = require('./database.js');
 
 function Hooks(client) {
     client.on('messageCreate', message => {
-        switch (message.channel.type) {
-            case 'GUILD_TEXT':
-                break;
-            case 'DM':
-                break;
-        }
         const content = message.content;
         if (!content) return;
         const command = content.substring(0, content.indexOf(' ')).toLowerCase();
@@ -27,6 +14,12 @@ function Hooks(client) {
             case '.updatecontact':
                 updateSupportContact(message);
                 break;
+            case '.block':
+                blockUser(message);
+                break;
+            case '.blocked':
+                listBlocked(message);
+                break;
             case '.accept':
                 resolveTicket(message, 'accepted');
             case '.deny':
@@ -34,18 +27,59 @@ function Hooks(client) {
             case '.resolve':
                 resolveTicket(message, 'resolved');
                 break;
-            case '.edit':
-                editTicket(message);
+            default:
+                if (message.channel.type === 'DM' /*&& CHECK IF USER HAS REQUESTED TICKET*/) {
+                    // Database set content
+                }
                 break;
-            case '.reopen':
-                reopenTicket(message);
-                break;
+        }
+    });
+
+    client.on('interactionCreate', interaction => {
+        if (!interaction.isMessageComponent()) return;
+
+        if (interaction.customId.includes('RequestTicket')) {
+            // create ticket in db
+            // send ticket dm
+        } else if (interaction.customId.includes('AcceptTicket')) {
+            resolveTicket(interaction, 'accepted');
+        }  else if (interaction.customId.includes('DenyTicket')) {
+            resolveTicket(interaction, 'denied');
+        }  else if (interaction.customId.includes('ResolveTicket')) {
+            resolveTicket(interaction, 'resolved');
+
+        } else if (interaction.customId.includes('setType')) {
+            const id = parseTicketId(interaction.customId);
+            if (!id) return interaction.reply({content:'Failed to identify ticket, please request a new one.\nIf this problem persists please contact a moderator directly', ephemeral:true});
+            if (!interaction.isSelectMenu()) return;
+            if (interaction.values.length < 1) {
+                var type = NULL;
+            } else {
+                var type = interaction.values[0];
+            }
+            db.setType(id, interaction.user.id, type).then(() => {
+                if (success) {
+                    return interaction.reply({content:'Changed type to ' + src.types[type] + '. Please send a message via the message bar below to set the comment.', ephemeral:true});
+                }
+            }).catch(error => {
+                switch(error) {
+                    case 'INVALID_USER':
+                    case 'INVALID_STATUS':
+                        break;
+                    case 'NO_TICKET':
+                        return interaction.reply({content:'Failed to identify ticket, please request a new one.\nIf this problem persists please contact a moderator directly', ephemeral:true});
+                }
+            });
+
+        } else if (interaction.customId.includes('submitTicket')) {
+            
         }
     });
 }
 //////////////////////////////////////////////////////////
 // Top Level Functions
 
+// .sendcontact : MOD/GUILD/DM : resends the contact embed
 function sendSupportContact (message) {
     isValid(client, message).then(valid => {
         if (!valid) return;
@@ -64,6 +98,7 @@ function sendSupportContact (message) {
     });
 }
 
+// .updatecontact : MOD/GUILD/DM : updates the contact embed to current configuration
 function updateSupportContact (message) {
     isValid(client, message).then(valid => {
         if (!valid) return;
@@ -95,9 +130,30 @@ function updateSupportContact (message) {
     });
 }
 
+// .accept [message] : MOD/GUILD_REPLY : accepts the replied ticket and sends the user a message through dm anonymously
+// .deny [message] : MOD/GUILD_REPLY : denies the replied ticket and sends the user a message through dm anonymously
+// .resolve [message] : MOD/GUILD_REPLY : resolves the replied ticket and sends the user a message through dm anonymously
 function resolveTicket (message, status) {
-    
+    // updates db entry
+    // updates ticket embed
+    // updates dm ticket embed
 }
+
+// .block [member|user_id] : MOD/GUILD/DM : blocks user from opening tickets
+function blockUser (message) {
+
+}
+
+// .unblock [member|user_id] : MOD/GUILD/DM : blocks user from opening tickets
+function blockUser (message) {
+
+}
+
+// .blocked : MOD/GUILD/DM : dm's a list of blocked users
+function listBlocked (message) {
+
+}
+
 
 function editTicket (message) {
 
@@ -145,6 +201,20 @@ function fetchPrivlege (client, user) {
             }).catch(() => resolve(false));
         }).catch(() => resolve(false));
     });
+}
+
+function parseTicketId(command) {
+    try {
+        const commands = command.split('-');
+        const id = parseInt(commands[1]);
+        if (id) {
+            return true;
+        }  else {
+            return false;
+        }
+    } catch {
+        return false;
+    }
 }
 
 //

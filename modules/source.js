@@ -21,5 +21,9 @@ module.exports = {
         ticketResolvedAction: new MessageActionRow(),
         dmTypeAction: new MessageActionRow(),
         dmReopenAction: new MessageActionRow()
+    }, types: {
+        0: 'Appeal',
+        1: 'Report',
+        2: 'Other'
     }
 };
