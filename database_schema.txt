@@ -1,8 +1,8 @@
 COLUMNS
 TICKET_ID INTEGER AUTO_INCREMENT NOT NULL PK
 USER_ID varchar(18) NOT NULL "user who made the ticket"
-STATUS number NOT NULL 0=requested, 1=pending, 2=resolved, 3=accepted, 4=denied
-TYPE number 0=appeal, 1=report, 2=other
+STATUS number NOT NULL 1=requested, 2=pending, 3=resolved, 4=accepted, 5=denied
+TYPE number 1=appeal, 2=report, 3=other
 COMMENT varchar(255)
 REMARKS varchar(255)
 TICKET_MESSAGE varchar(18) "the private support ticket message"
@@ -15,6 +15,11 @@ EXPIRE DATE "the time the ticket will expire, 0 for never expire"
 Functions
 createRequest // Initializes an empty request
     // INSERT ticket_id, user_id, status=0, response_message, expire
+    // delete other requests by user
+    // delete messasges related to it
+    // create new ticket
+    // send response
+    // update with messageid
     // fails if there is another ticket from the same user with a status of 0
 
 setType // Sets the type of the request 

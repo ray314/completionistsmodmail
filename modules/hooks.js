@@ -1,4 +1,5 @@
-const config = require('../config.json');
+//const config = require('../config.json');
+const config = require('../testing-config.json');
 const src = require('./source.js');
 const db = require('./database.js');
 
@@ -6,8 +7,9 @@ function Hooks(client) {
     client.on('messageCreate', message => {
         const content = message.content;
         if (!content) return;
-        const command = content.substring(0, content.indexOf(' ')).toLowerCase();
-        switch(command) {
+        if (content.substring(0, 1) != '.') return;
+        const command = content.split(' ');
+        switch(command[0]) {
             case '.sendcontact':
                 sendSupportContact(message);
                 break;
@@ -28,8 +30,26 @@ function Hooks(client) {
                 resolveTicket(message, 'resolved');
                 break;
             default:
-                if (message.channel.type === 'DM' /*&& CHECK IF USER HAS REQUESTED TICKET*/) {
-                    // Database set content
+                if (message.channel.type === 'DM') {
+                    db.getRequest(message.author.id).then(result => {
+                        if (result && result.id) {
+                            db.setComment(result.id, message.author.id, content.substring(0, 500)).then(() => {
+                                message.channel.messages.fetch(result.response).then(response => {
+                                    if (response.embeds.length < 1) return;
+                                    response.edit([response.embeds[0].setDescription(content.substring(0, 500))]);
+                                }).catch(error => console.log(error));
+                            }).catch(error => {
+                                switch(error) {
+                                    case 'INVALID_USER':
+                                        break;
+                                    case 'NO_TICKET':
+                                        break;
+                                }
+                            });
+                        } else {
+                            return;
+                        }
+                    });
                 }
                 break;
         }
@@ -38,33 +58,47 @@ function Hooks(client) {
     client.on('interactionCreate', interaction => {
         if (!interaction.isMessageComponent()) return;
 
-        if (interaction.customId.includes('RequestTicket')) {
-            // create ticket in db
-            // send ticket dm
-        } else if (interaction.customId.includes('AcceptTicket')) {
+        if (interaction.customId.includes('RequestTicket')) { // This command is a mess rn. getrequest > delete previous response > create/update ticket > send new response > update ticket with new message id   
+            db.getRequest(interaction.user.id).then(result => {
+                let customEmbed = Object.assign(Object.create(Object.getPrototypeOf(src.embeds.dmRequestEmbed)), src.embeds.dmRequestEmbed);
+                let customAction = Object.assign(Object.create(Object.getPrototypeOf(src.actions.dmRequestAction)), src.actions.dmRequestAction);
+                for (const component of customAction.components) {
+                    component.setCustomId(component.customId+=result.id)
+                }
+                interaction.user.send({embeds:[customEmbed], components:[customAction]}).then(async message => {
+                    if (result && result.response) {
+                        message.channel.messages.fetch(result.response).then(oldmessage => {
+                            oldmessage.edit();
+                        }).catch(error=>console.log(error));
+                        db.resetRequest(result.id, message.id);
+                    } else {
+                        db.createRequest(interaction.user.id, message.id).then();
+                    }
+                });
+            });
+        } else if (interaction.customId.includes('acceptTicket')) {
             resolveTicket(interaction, 'accepted');
-        }  else if (interaction.customId.includes('DenyTicket')) {
+        }  else if (interaction.customId.includes('denyTicket')) {
             resolveTicket(interaction, 'denied');
-        }  else if (interaction.customId.includes('ResolveTicket')) {
+        }  else if (interaction.customId.includes('resolveTicket')) {
             resolveTicket(interaction, 'resolved');
 
         } else if (interaction.customId.includes('setType')) {
             const id = parseTicketId(interaction.customId);
             if (!id) return interaction.reply({content:'Failed to identify ticket, please request a new one.\nIf this problem persists please contact a moderator directly', ephemeral:true});
+
             if (!interaction.isSelectMenu()) return;
             if (interaction.values.length < 1) {
                 var type = NULL;
             } else {
                 var type = interaction.values[0];
             }
+
             db.setType(id, interaction.user.id, type).then(() => {
-                if (success) {
-                    return interaction.reply({content:'Changed type to ' + src.types[type] + '. Please send a message via the message bar below to set the comment.', ephemeral:true});
-                }
+                return interaction.reply({content:'Changed type to ' + src.types[type] + '. Please send a message via the message bar below to set the comment.', ephemeral:true});
             }).catch(error => {
                 switch(error) {
                     case 'INVALID_USER':
-                    case 'INVALID_STATUS':
                         break;
                     case 'NO_TICKET':
                         return interaction.reply({content:'Failed to identify ticket, please request a new one.\nIf this problem persists please contact a moderator directly', ephemeral:true});
@@ -81,9 +115,9 @@ function Hooks(client) {
 
 // .sendcontact : MOD/GUILD/DM : resends the contact embed
 function sendSupportContact (message) {
-    isValid(client, message).then(valid => {
+    isValid(message).then(valid => {
         if (!valid) return;
-        client.channels.fetch(config.SupportChannelID).then(channel => {
+        message.client.channels.fetch(config.SupportChannelID).then(channel => {
             if (!channel) return;
             return channel.send({embeds:[src.embeds.contactEmbed],components:[src.actions.contactAction]}).then(contact => {
                 if (contact) {
@@ -100,9 +134,9 @@ function sendSupportContact (message) {
 
 // .updatecontact : MOD/GUILD/DM : updates the contact embed to current configuration
 function updateSupportContact (message) {
-    isValid(client, message).then(valid => {
+    isValid(message).then(valid => {
         if (!valid) return;
-        client.channels.fetch(config.SupportChannelID).then(channel => { // Fetch support chanmel
+        message.client.channels.fetch(config.SupportChannelID).then(channel => { // Fetch support chanmel
             if (!channel) return message.react('❌');
             channel.message.fetch({limit:100}).then(messages => { // Fetch all messages
                 if (!messages) return message.react('❌');
@@ -154,7 +188,6 @@ function listBlocked (message) {
 
 }
 
-
 function editTicket (message) {
 
 }
@@ -163,13 +196,17 @@ function reopenTicket (message) {
 
 }
 
+function cancelTicket (ticketid) {
+
+}
+
 //
 //////////////////////////////////////////////////////////
 // Sub Level Functions
 function isValid (message) {
-    return Promise((resolve) => {
+    return new Promise((resolve) => {
         if (message.member) {
-            if (message.member.roles.cache.hasAny(config.ModeratorRoleID)) {
+            if (config.ModeratorRoleID.some((r)=> message.member.roles.cache.has(r))) {
                 resolve(true);
             } else {
                 resolve(false);
@@ -189,7 +226,7 @@ function isValid (message) {
 }
 
 function fetchPrivlege (client, user) {
-    return Promise((resolve) => {
+    return new Promise((resolve) => {
         client.guilds.fetch(config.GuildID).then(guild => {
             if (!guild) return resolve(false);
             guild.members.fetch(user.id).then(member => {

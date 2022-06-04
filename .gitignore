@@ -1,4 +1,6 @@
 node_modules/**
-data/**
+database/**
 testing-config.json
 test-auth.json
+.env
+run.bat

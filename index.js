@@ -1,8 +1,6 @@
+require('dotenv').config();
 const { Intents, Client } = require("discord.js");
 const { Hooks } = require('./modules/hooks.js');
-const db = require('./modules/database.js');
-const auth = require('./auth.json');
-const config = require('./config.json');
 
 const client = new Client({ intents: [
     Intents.FLAGS.GUILDS, 
@@ -16,4 +14,8 @@ client.once('ready', () => {
     Hooks(client);
 });
 
-client.login(auth.token);
+client.on('error', error => {
+	console.log("Discord Error:\n"+error);
+});
+
+client.login(process.env.TOKEN);
