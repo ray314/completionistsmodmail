@@ -37,6 +37,12 @@ function generateTicketEmbed() {
     .setDescription('This is a ticket embed');
 }
 
+function generateTicketEditingEmbed() {
+    return new MessageEmbed()
+    .setColor('#d6b3f2')
+    .setDescription('*Ticket is currently being edited*');
+}
+
 // -- ACTIONS -- \\
 function getContactAction() {
     return [new MessageActionRow().addComponents(
@@ -93,6 +99,7 @@ function generateTicketAction(id) {
     )];
 }
 
+
 module.exports = {
     getContactEmbed,
     generateDmRequestEmbed,
@@ -101,6 +108,7 @@ module.exports = {
     generateDmExpiredEmbed,
     generateDmReplacedEmbed,
     generateTicketEmbed,
+    generateTicketEditingEmbed,
     getContactAction,
     generateDmRequestAction,
     generateDmEditAction,
@@ -109,8 +117,9 @@ module.exports = {
     status: {
         1: "REQUESTED",
         2: "PENDING",
-        3: "RESOLVED",
-        4: "ACCEPTED",
-        5: "DENIED"
+        3: "EDITING",
+        4: "RESOLVED",
+        5: "ACCEPTED",
+        6: "DENIED"
     }
 };

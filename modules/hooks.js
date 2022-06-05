@@ -1,6 +1,6 @@
 //const config = require('../config.json');
 const config = require('../testing-config.json');
-const { getContactEmbed, generateDmRequestEmbed, generateDmSubmittedEmbed, generateDmResolveEmbed, generateDmExpiredEmbed, generateDmReplacedEmbed, getContactAction, generateTicketPendingAction, generateDmRequestAction, generateDmEditAction, generateDmReopenAction, generateTicketEmbed, generateTicketAction } = require('./source.js');
+const { getContactEmbed, generateDmRequestEmbed, generateDmSubmittedEmbed, generateDmResolveEmbed, generateDmExpiredEmbed, generateDmReplacedEmbed, generateTicketEditingEmbed, getContactAction, generateDmRequestAction, generateDmEditAction, generateDmReopenAction, generateTicketEmbed, generateTicketAction } = require('./source.js');
 const db = require('./database.js');
 
 function Hooks(client) {
@@ -96,23 +96,41 @@ function Hooks(client) {
             const id = parseTicketId(interaction.customId);
             if (!id) return interaction.reply({content:'Failed to identify ticket, please request a new one.\nIf this problem persists please contact a moderator directly', ephemeral:true});
             
-            db.getTicket(id).then(result => {
-                if (!result || !result.status || result.status != 1) return;
+            db.getTicket(id).then(async result => {
+                if (!result || !result.status || (result.status != 1 && result.status != 3)) return;
                 if (!result.type) return interaction.reply({content:'Please set an appeal type.', ephemeral:true});
                 if (!result.comment) return interaction.reply({content:'Please send a message via the message bar below and tell us how we can help you. (Max 500 Characters)', ephemeral:true});
-                fetchTicketChannel().then(channel => {
-                    channel.send({embeds:[generateTicketEmbed()],components:generateTicketAction()}).then(ticket => {
-                        db.submitTicket(result.id, interaction.user.id, ticket.id).then(() => {
-                            interaction.reply({content:'Submitted ticket! Someone from our mod team will review your request shortly.', ephemeral:true});
-                            interaction.message.edit({embeds:[generateDmSubmittedEmbed()],components:generateDmEditAction(result.id)});
-                        });
+                fetchTicketChannel(client).then(async channel => {
+                    if (result.messageid) {
+                        var ticket = await channel.messages.fetch(result.messageid);
+                        await ticket.edit({embeds:[generateTicketEmbed()],components:generateTicketAction()});
+                    } else {
+                        var ticket = await channel.send({embeds:[generateTicketEmbed()],components:generateTicketAction()});
+                    }
+
+                    db.submitTicket(id, interaction.user.id, ticket.id).then(() => {
+                        interaction.reply({content:'Submitted ticket! Someone from our mod team will review your request shortly.', ephemeral:true});
+                        interaction.message.edit({embeds:[generateDmSubmittedEmbed()],components:generateDmEditAction(id)});
                     });
                 });
             });
-            // send a message to tickets
-            // update db
-            // edit response
-        }
+        } else if (interaction.customId.includes('EditTicket')) {
+            if (!interaction.isButton()) return;
+            const id = parseTicketId(interaction.customId);
+            if (!id) return interaction.reply({content:'Failed to identify ticket, please request a new one.\nIf this problem persists contact a moderator directly', ephemeral:true});
+            db.getTicket(id).then(result => {
+                if (!result || result.status && result.status != 2) return;
+                db.setStatus(id, interaction.user.id, 3).then(() => {
+                    fetchTicketMessage(client, result.messageid).then(ticket => {
+                        ticket.edit({embeds:[generateTicketEditingEmbed()],components:[]});
+                    })
+                    
+                    interaction.message.edit({embeds:[generateDmRequestEmbed()],components:generateDmRequestAction(id)}).then(() => {
+                        return interaction.reply({content:'Your ticket is now being edited.', ephemeral:true});
+                    });
+                });
+            });
+        } 
     });
 }
 //////////////////////////////////////////////////////////
@@ -122,7 +140,8 @@ function openTicket(interaction) { //  I think this control flow is good for now
     db.getRequest(interaction.user.id).then(async result => {
         if (result && result.id) {
             var ticketid = result.id;
-            const response = await getOrFetchResponse(interaction.client, result.id);
+            console.log(result.id);
+            const response = await callTicketResponse(interaction.client, result.id);
             if (!response) return;
             await response.edit({embeds:[generateDmReplacedEmbed()],components:[]});
             await db.resetRequest(ticketid, interaction.user.id);
@@ -163,13 +182,13 @@ function updateSupportContact (message) {
         if (!valid) return;
         message.client.channels.fetch(config.SupportChannelID).then(channel => { // Fetch support chanmel
             if (!channel) return message.react('❌');
-            channel.message.fetch({limit:100}).then(messages => { // Fetch all messages
+            channel.messages.fetch({limit:100}).then(messages => { // Fetch all messages
                 if (!messages) return message.react('❌');
                 for (const channel_message of messages.toJSON()) { // Iterate all messages
                     if (!channel_message.components) continue;
                     for (message_component of channel_message.components) { // Iterate all components
-                        if (message_component.components.length > 0 && message_component.components[0].customId == 'RequestTicket') { // Check if component matches requestTicket
-                            return channel_message.edit({embeds:[src.embeds.contactEmbed],components:[src.actions.contactAction]}).then(edited => { // Update message configuration
+                        if (message_component.components.length > 0 && message_component.components[0].customId == 'OpenTicket') { // Check if component matches requestTicket
+                            return channel_message.edit({embeds:[getContactEmbed()],components:getContactAction()}).then(contact => { // Update message configuration
                                 if (contact) {
                                     message.react('✅');
                                 } else {
@@ -265,6 +284,58 @@ function fetchPrivlege (client, user) {
     });
 }
 
+function callTicketResponse(client, ticketid) {
+    return new Promise((resolve) => {
+        db.getTicket(ticketid).then(result => { // get userid from ticket
+            if (!result || !result.userid) return;
+            fetchTicketResponse(client, result.userid, result.responseid).then(message => {
+                resolve(message);
+            })
+        });
+    });
+}
+
+function fetchTicketResponse(client, userid, id) {
+    return new Promise((resolve) => {
+        client.users.fetch(userid).then(user => { // get user from userid
+            if (!user) return; 
+            user.createDM().then(channel => { // get dmchannel from user
+                channel.messages.fetch(id).then(message => { // get response in dm channel
+                    resolve(message); // return response
+                }).catch(error => {
+                    console.log('Error while fetching response message of ' + ticketid + '\n' + error);
+                    resolve(null);
+                });
+            });
+        });
+    });
+}
+
+function callTicketMessage(client, ticketid) {
+    return new Promise((resolve) => {
+        db.getTicket(ticketid).then(result => { // get messageid from ticket
+            if (!result || !result.messageid) return;
+            fetchTicketMessage(client, result.messageid).then(message => {
+                resolve(message);
+            });
+        });
+    });
+}
+
+function fetchTicketMessage(client, id) {
+    return new Promise((resolve) => {
+        fetchTicketChannel(client).then(channel => { // get tickets channel
+            channel.messages.fetch(id).then(message => { // get message from tickets channel
+                if (!message) return; 
+                resolve(message);
+            }).catch(error => {
+                console.log('Error while fetching ticket message of ' + ticketid + '\n' + error);
+                resolve(null);
+            });
+        });
+    });
+}
+
 function fetchTicketChannel(client) {
     return new Promise((resolve, reject) => {
         client.channels.fetch(config.TicketChannelID).then(channel => {
@@ -280,49 +351,12 @@ function fetchTicketChannel(client) {
     });
 }
 
-function getOrFetchResponse(client, ticketid) {
-    return new Promise((resolve) => {
-        db.getTicket(ticketid).then(result => { // get userid from ticket
-            if (!result || !result.userid) return;
-            client.users.fetch(result.userid).then(user => { // get user from userid
-                if (!user) return; 
-                user.createDM().then(channel => { // get dmchannel from user
-                    channel.messages.fetch(result.responseid).then(message => { // get response in dm channel
-                        resolve(message); // return response
-                    }).catch(error => {
-                        console.log('Error while fetching response message of ' + ticketid + '\n' + error);
-                        resolve(null);
-                    });
-                });
-            });
-        });
-    });
-}
-
-function getOrFetchTicketMessage(client, ticketid) {
-    return new Promise((resolve) => {
-        db.getTicket(ticketid).then(result => {
-            client.channels.fetch(config.TicketChannelID).then(channel => {
-                channel.messages.fetch(result.messageid).then(message => {
-                    resolve(message);
-                }).catch(error => {
-                    console.log('Error while fetching ticket message of ' + ticketid + '\n' + error);
-                    resolve(null);
-                });
-            }).catch(error => {
-                console.log('Error while fetching support channel for ' + ticketid + '\n' + error);
-                resolve(null);
-            });
-        });
-    });
-}
-
 function parseTicketId(command) {
     try {
         const commands = command.split('-');
         const id = parseInt(commands[1]);
         if (id) {
-            return true;
+            return id;
         }  else {
             return false;
         }

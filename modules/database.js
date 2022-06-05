@@ -74,6 +74,18 @@ module.exports = {
             });
         });
     },
+    setStatus: function(ticketid, userid, status) {
+        return new Promise((resolve, reject) => {
+            isOwner(ticketid, userid).then(() => {
+                db.run('UPDATE TICKETS SET status=? WHERE ticketid=?', [status, ticketid], function(err) {
+                    if (err) {
+                        return reject('NO_TICKET');
+                    }
+                    return resolve();
+                });
+            }).catch(error => reject(error));
+        });
+    }, 
     setType: function(ticketid, userid, type) {
         return new Promise((resolve, reject) => {
             isOwner(ticketid, userid).then(() => {
