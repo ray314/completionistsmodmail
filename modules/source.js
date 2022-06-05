@@ -1,50 +1,116 @@
-const { MessageEmbed, MessageActionRow, MessageButton, MessageSelectMenu } = require('discord.js');
+const { MessageEmbed, MessageActionRow, MessageButton, MessageSelectMenu, TextInputComponent, Message} = require('discord.js');
+
+// -- EMBEDS -- \\
+function getContactEmbed() {
+    return new MessageEmbed()
+    .setColor('#d6b3f2')
+    .setDescription('Click the button below to request a support ticket!\nMake sure you\'ve read everything here first.');
+}
+
+function generateDmRequestEmbed() {
+    return new MessageEmbed()
+        .setDescription('Test');
+}
+
+function generateDmSubmittedEmbed() {
+    return new MessageEmbed()
+        .setDescription('Submitted');
+}
+
+function generateDmResolveEmbed() {
+    
+}
+
+function generateDmExpiredEmbed() {
+    
+}
+
+function generateDmReplacedEmbed() {
+    return new MessageEmbed()
+    .setColor('#d6b3f2')
+    .setDescription('*ticket cancelled by another ticket*');
+}
+
+function generateTicketEmbed() {
+    return new MessageEmbed()
+    .setColor('#d6b3f2')
+    .setDescription('This is a ticket embed');
+}
+
+// -- ACTIONS -- \\
+function getContactAction() {
+    return [new MessageActionRow().addComponents(
+        new MessageButton()
+            .setCustomId('OpenTicket')
+            .setLabel('Request Support')
+            .setStyle('PRIMARY'))];
+}
+
+function generateDmRequestAction(id) {
+    return [ new MessageActionRow().addComponents(
+        new MessageSelectMenu()
+            .setCustomId('SetType-'+id)
+            .setPlaceholder('Type')
+            .setMinValues(1)
+            .setMaxValues(1)
+            .addOptions([{label:'Appeal',value:'APPEAL'},{label:'Report',value:'REPORT'},{label:'Other',value:'OTHER'}])
+    ), new MessageActionRow().addComponents(
+        new MessageButton()
+            .setCustomId('SubmitTicket-'+id)
+            .setLabel('Submit')
+            .setStyle('PRIMARY')
+    )];
+}
+
+function generateDmEditAction(id) {
+    return [ new MessageActionRow().addComponents(
+        new MessageButton()
+            .setCustomId('EditTicket-'+id)
+            .setLabel('Edit')
+            .setStyle('PRIMARY')
+        )
+    ];
+}
+
+function generateDmReopenAction() {
+    
+}
+
+function generateTicketAction(id) {
+    return [ new MessageActionRow().addComponents(
+        new MessageButton()
+            .setCustomId('ResolveTicket-'+id)
+            .setLabel('Resolve')
+            .setStyle('PRIMARY'),
+        new MessageButton()
+            .setCustomId('AcceptTicket-'+id)
+            .setLabel('Accept')
+            .setStyle('SUCCESS'),
+        new MessageButton()
+            .setCustomId('DenyTicket-'+id)
+            .setLabel('Deny')
+            .setStyle('DANGER')
+    )];
+}
 
 module.exports = {
-    embeds: {
-        contactEmbed: new MessageEmbed()
-            .setColor('#d6b3f2')
-            .setDescription('Click the button below to request a support ticket!\nMake sure you\'ve read everything here first.'),
-        dmRequestEmbed: new MessageEmbed()
-        .setDescription('Test'),
-        dmSubmittedEmbed: new MessageEmbed(),
-        dmResolveEmbed: new MessageEmbed(),
-        dmExpiredEmbed: new MessageEmbed(),
-        dmReplacedEmbed: new MessageEmbed()
-            .setDescription('*noooo!*')
-
-    }, actions: {
-        contactAction: new MessageActionRow().addComponents(
-            new MessageButton()
-                .setCustomId('RequestTicket')
-                .setLabel('Request Support')
-                .setStyle('PRIMARY')
-        ),
-        ticketPendingAction: new MessageActionRow(),
-        ticketResolvedAction: new MessageActionRow(),
-        dmRequestAction: new MessageActionRow().addComponents(
-            new MessageSelectMenu()
-                .setCustomId('SelectType')
-                .setPlaceholder('Type')
-                .setMinValues(0)
-                .setMaxValues(1)
-                .addOptions([{label:'Appeal',value:1},{label:'Report',value:2},{label:'Other',value:3}]),
-            new MessageButton()
-                .setCustomId('SubmitTicket')
-                .setLabel('Submit')
-                .setStyle('PRIMARY')
-        ),
-        dmEditAction: new MessageActionRow(),
-        dmReopenAction: new MessageActionRow()
-    }, types: {
-        1: 'Appeal',
-        2: 'Report',
-        3: 'Other'
-    }, statuses: {
-        1: 'REQUESTED',
-        2: 'PENDING',
-        3: 'RESOLVED',
-        4: 'ACCEPTED',
-        5: 'DENIED'
-    } 
+    getContactEmbed,
+    generateDmRequestEmbed,
+    generateDmSubmittedEmbed,
+    generateDmResolveEmbed,
+    generateDmExpiredEmbed,
+    generateDmReplacedEmbed,
+    generateTicketEmbed,
+    getContactAction,
+    generateDmRequestAction,
+    generateDmEditAction,
+    generateDmReopenAction,
+    generateTicketAction,
+    status: {
+        1: "REQUESTED",
+        2: "PENDING",
+        3: "RESOLVED",
+        4: "ACCEPTED",
+        5: "DENIED"
+    }
 };

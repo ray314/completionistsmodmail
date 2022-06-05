@@ -35,3 +35,42 @@ submitTicket // Submits ticket with finalized data
 closeTicket // Closes ticket with moderator remarks
     // UPDATE status, remarks, response_message, expire
     // RETURNS { ticket_message, response_message }
+
+
+Modal Object:
+```
+new Modal()
+    .setCustomId('SubmitTicket')
+    .setTitle('Support Ticket')
+    .addComponents(new MessageActionRow()
+        .addComponents(new MessageSelectMenu()
+            .setCustomId('TicketType')
+            .setPlaceholder('Appeal Type')
+            .setMinValues(1)
+            .setMaxValues(1)
+            .addOptions([{label:'Appeal',value:'APPEAL'},{label:'Report',value:'REPORT'},{label:'Other',value:'OTHER'}])
+        ));
+```
+
+Interaction Handler:
+```
+client.on('interactionCreate', interaction => {
+    if (!interaction.isModalSubmit()) return;
+
+    if (interaction.customId.includes('SubmitTicket')) {
+        console.log(interaction.fields.getField('TicketType'));
+        interaction.reply('received');
+    }
+});
+```
+
+Output
+```
+C:\Program Files\nodejs\node.exe .\index.js
+{value: undefined, type: 'SELECT_MENU', customId: 'TicketType'}
+```
+
+(yes I am selecting an option before submitting the modal)
+
+It works fine with TextInputs, I have not tested with other Components
+`{value: 'This is text submitted through a modal interaction', type: 'TEXT_INPUT', customId: 'TicketComment'}`
