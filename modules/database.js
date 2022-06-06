@@ -3,6 +3,7 @@ const EXPIRE = 72 // time in hours before a requested ticket expires or a resolv
 const sqlite3 = require('sqlite3').verbose();
 var db = new sqlite3.Database('./database/tickets.db');
 db.run('CREATE TABLE IF NOT EXISTS TICKETS(ticketid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, userid TEXT NOT NULL, status INTEGER NOT NULL, type TEXT, comment TEXT, remarks TEXT, messageid TEXT, responseid TEXT, expire INTEGER)');
+db.run('CREATE TABLE IF NOT EXISTS BLOCKED(userid TEXT PRIMARY KEY NOT NULL UNIQUE, expire INTEGER NOT NULL)');
 
 // Checks if user owns the ticket.
 function isOwner(ticketid, userid) {
@@ -54,7 +55,7 @@ module.exports = {
     },
     getRequest: function(userid) {
         return new Promise((resolve) => {
-            db.get('SELECT ticketid id, userid user, responseid response FROM TICKETS WHERE userid=? AND status=1', [userid], function(err, result) {
+            db.get('SELECT * FROM TICKETS WHERE userid=? AND status=1 OR status=3', [userid], function(err, result) {
                 if (result) {
                     return resolve(result);
                 } else {
@@ -122,10 +123,10 @@ module.exports = {
             }).catch(error => reject(error));
         });
     }, 
-    submitTicket: function(ticketid, userid, messageid) {
+    setMessage: function(ticketid, messageid) {
         return new Promise((resolve, reject) => {
             isOwner(ticketid, userid).then(() => {
-                db.run('UPDATE TICKETS SET status=2, messageid=? WHERE ticketid=?', [messageid, ticketid], function(err) {
+                db.run('UPDATE TICKETS SET responseid=? WHERE ticketid=?', [responseid, ticketid], function(err) {
                     if (err) {
                         return reject('NO_TICKET');
                     }
@@ -134,12 +135,54 @@ module.exports = {
             }).catch(error => reject(error));
         });
     }, 
-    closeTicket: function() {
-
+    submitTicket: function(ticketid, userid, messageid) {
+        return new Promise((resolve, reject) => {
+            isOwner(ticketid, userid).then(() => {
+                db.run('UPDATE TICKETS SET status=2, messageid=?, expire=0 WHERE ticketid=?', [messageid, ticketid], function(err) {
+                    if (err) {
+                        return reject('NO_TICKET');
+                    }
+                    return resolve();
+                });
+            }).catch(error => reject(error));
+        });
+    }, 
+    resolveTicket: function(ticketid, status, responseid, remarks) {
+        return new Promise((resolve, reject) => {
+            db.run('UPDATE TICKETS SET status=?, remarks=?, responseid=?, expire=? WHERE ticketid=?', [status, remarks, responseid, new Date().getTime()+(72*3600000), ticketid], function(err) {
+                if (err) {
+                    return reject('NO_TICKET');
+                }
+                return resolve();
+            });
+        });
     },
-    deleteTicket: function(ticketid) { // only used if theres missing data
+    deleteTicket: function(ticketid) {
         return new Promise((resolve) => {
-            db.run('DELETE FROM table WHERE ticketid=?', [ticketid], function(err) {
+            db.run('DELETE FROM TICKETS WHERE ticketid=?', [ticketid], function(err) {
+                resolve();
+            });
+        });
+    },
+    blockUser: function(userid, expire) {
+        return new Promise((resolve) => {
+            db.run('INSERT INTO BLOCKED (userid,expire) VALUES(?,?)', [userid, expire], function(err) {
+                if (err) {
+                    db.run('UPDATE BLOCKED SET expire=? WHERE userid=?', [expire,userid], function(err) {
+                        if (err) {
+                            return reject();
+                        }
+                        return resolve();
+                    });
+                } else {
+                    return resolve();
+                }
+            });
+        });
+    },
+    unblockUser: function(userid) {
+        return new Promise((resolve) => {
+            db.run('DELETE FROM BLOCKED WHERE ticketid=?', [ticketid], function(err) {
                 resolve();
             });
         });

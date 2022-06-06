@@ -1,6 +1,6 @@
 //const config = require('../config.json');
 const config = require('../testing-config.json');
-const { getContactEmbed, generateDmRequestEmbed, generateDmSubmittedEmbed, generateDmResolveEmbed, generateDmExpiredEmbed, generateDmReplacedEmbed, generateTicketEditingEmbed, getContactAction, generateDmRequestAction, generateDmEditAction, generateDmReopenAction, generateTicketEmbed, generateTicketAction } = require('./source.js');
+const { getContactEmbed, generateDmRequestEmbed, generateDmSubmittedEmbed, generateDmResolveEmbed, generateDmExpiredEmbed, generateDmReplacedEmbed, generateTicketEditingEmbed, generateTicketResolvedEmbed, getContactAction, generateDmRequestAction, generateDmEditAction, generateDmReopenAction, generateTicketEmbed, generateTicketAction, generateDmResolvedEmbed, statusToInt, intToStatus} = require('./source.js');
 const db = require('./database.js');
 
 function Hooks(client) {
@@ -20,23 +20,28 @@ function Hooks(client) {
                 case '.block':
                     blockUser(message);
                     break;
+                case '.block':
+                    unblockUser(message);
+                    break;
                 case '.blocked':
                     listBlocked(message);
                     break;
                 case '.accept':
-                    resolveTicket(message, 'accepted');
+                    resolveTicket(message, 'ACCEPTED');
+                    break;
                 case '.deny':
-                    resolveTicket(message, 'denied');
+                    resolveTicket(message, 'DENIED');
+                    break;
                 case '.resolve':
-                    resolveTicket(message, 'resolved');
+                    resolveTicket(message, 'RESOLVED');
                     break;
             }
         } else {
             if (message.channel.type === 'DM') { // Discord.JS doesnt support TextInputInteractions as of 13.7
                 db.getRequest(message.author.id).then(result => {
-                    if (result && result.id) {
-                        db.setComment(result.id, message.author.id, content.substring(0, 500)).then(() => {
-                            message.channel.messages.fetch(result.response).then(response => {
+                    if (result && result.ticketid) {
+                        db.setComment(result.ticketid, message.author.id, content.substring(0, 500)).then(() => {
+                            message.channel.messages.fetch(result.responseid).then(response => {
                                 if (response.embeds.length < 1) return;
                                 response.edit({embeds:[response.embeds[0].setDescription(content.substring(0, 500))]}).then(() => {
                                     message.react('✅');
@@ -63,13 +68,12 @@ function Hooks(client) {
         
         if (interaction.customId.includes('OpenTicket')) { 
             openTicket(interaction);            
-        } else if (interaction.customId.includes('acceptTicket')) {
-            resolveTicket(interaction, 'accepted');
-        }  else if (interaction.customId.includes('denyTicket')) {
-            resolveTicket(interaction, 'denied');
-        }  else if (interaction.customId.includes('resolveTicket')) {
-            resolveTicket(interaction, 'resolved');
-
+        } else if (interaction.customId.includes('AcceptTicket')) {
+            resolveTicketInteraction(interaction, 'ACCEPTED');
+        }  else if (interaction.customId.includes('DenyTicket')) {
+            resolveTicketInteraction(interaction, 'DENIED');
+        }  else if (interaction.customId.includes('ResolveTicket')) {
+            resolveTicketInteraction(interaction, 'RESOLVED');
         } else if (interaction.customId.includes('SetType')) {
             if (!interaction.isSelectMenu()) return;
             const id = parseTicketId(interaction.customId);
@@ -103,9 +107,9 @@ function Hooks(client) {
                 fetchTicketChannel(client).then(async channel => {
                     if (result.messageid) {
                         var ticket = await channel.messages.fetch(result.messageid);
-                        await ticket.edit({embeds:[generateTicketEmbed()],components:generateTicketAction()});
+                        await ticket.edit({embeds:[generateTicketEmbed(id.toString())],components:generateTicketAction()});
                     } else {
-                        var ticket = await channel.send({embeds:[generateTicketEmbed()],components:generateTicketAction()});
+                        var ticket = await channel.send({embeds:[generateTicketEmbed(id.toString())],components:generateTicketAction()});
                     }
 
                     db.submitTicket(id, interaction.user.id, ticket.id).then(() => {
@@ -138,17 +142,15 @@ function Hooks(client) {
 
 function openTicket(interaction) { //  I think this control flow is good for now
     db.getRequest(interaction.user.id).then(async result => {
-        if (result && result.id) {
-            var ticketid = result.id;
-            console.log(result.id);
-            const response = await callTicketResponse(interaction.client, result.id);
+        if (result && result.ticketid) { 
+            var ticketid = result.ticketid;
+            const response = await callTicketResponse(interaction.client, result.ticketid);
             if (!response) return;
             await response.edit({embeds:[generateDmReplacedEmbed()],components:[]});
-            await db.resetRequest(ticketid, interaction.user.id);
+            if (result.status == 1) await db.resetRequest(ticketid, interaction.user.id);
         } else {
-            var ticketid = await db.createRequest(interaction.user.id, result.response);
+            var ticketid = await db.createRequest(interaction.user.id, result.responseid);
         }
-        
         interaction.user.send({embeds:[generateDmRequestEmbed()], components:generateDmRequestAction(ticketid)}).then(async message => {
             db.setResponse(ticketid, interaction.user.id, message.id);
             interaction.reply({content:'Please continue your ticket request in DMs.',ephemeral:true});
@@ -158,7 +160,7 @@ function openTicket(interaction) { //  I think this control flow is good for now
 
 // .sendcontact : MOD/GUILD/DM : resends the contact embed
 function sendSupportContact (message) {
-    isValid(message).then(valid => {
+    isValid(message, message.user).then(valid => {
         if (!valid) return;
         message.client.channels.fetch(config.SupportChannelID).then(channel => {
             if (!channel) return;
@@ -178,7 +180,7 @@ function sendSupportContact (message) {
 
 // .updatecontact : MOD/GUILD/DM : updates the contact embed to current configuration
 function updateSupportContact (message) {
-    isValid(message).then(valid => {
+    isValid(message, message.user).then(valid => {
         if (!valid) return;
         message.client.channels.fetch(config.SupportChannelID).then(channel => { // Fetch support chanmel
             if (!channel) return message.react('❌');
@@ -212,32 +214,104 @@ function updateSupportContact (message) {
 // .deny [message] : MOD/GUILD_REPLY : denies the replied ticket and sends the user a message through dm anonymously
 // .resolve [message] : MOD/GUILD_REPLY : resolves the replied ticket and sends the user a message through dm anonymously
 function resolveTicket (message, status) {
-    // updates db entry
-    // updates ticket embed
-    // updates dm ticket embed
+    isValid(message, message.user).then(valid => {
+        if (!valid) return;
+        try {
+            var ticket = message.reference.messageId;
+        } catch {
+            return message.react('❌');
+        }
+        
+        message.channel.messages.fetch(ticket).then(ticketmessage => {
+            if (ticketmessage.embeds.length < 0) return message.react('❌');  
+            try { 
+                var id = parseInt(ticketmessage.embeds[0].footer.text); 
+            } catch {
+                return message.react('❌');
+            }
+            if (!id) return message.react('❌');
+            
+            ticketmessage.edit({embeds:[generateTicketResolvedEmbed()],components:[]});
+
+            callTicketResponse(message.client, id).then(oldresponse => {
+                oldresponse.edit({embeds:[generateDmResolvedEmbed()],components:[]});
+                const remarks = parseRemarks(message.content);
+                oldresponse.channel.send({embeds:[generateDmResolveEmbed(status, remarks)],components:[]}).then(newresponse => {
+                    db.resolveTicket(id, statusToInt[status], newresponse.id, remarks).then(() => {
+                        return message.react('✅');
+                    });
+                });
+            });
+        });
+    });
 }
 
-// .block [member|user_id] : MOD/GUILD/DM : blocks user from opening tickets
-function blockUser (message) {
+function resolveTicketInteraction (interaction, status) {
+    if (!interaction.isButton()) return; 
+    isValid(interaction, interaction.user).then(valid => {
+        if (!valid) return;
+        if (interaction.message.embeds.length < 0) return interaction.reply({content:'error: resolveTicketInteraction, message does not contain embeds',ephemeral:true});  
+        try { 
+            var id = parseInt(interaction.message.embeds[0].footer.text); 
+        } catch {
+            return interaction.reply({content:'error: resolveTicketInteraction, embed does not contain footer',ephemeral:true});
+        }
+        if (!id) return interaction.reply({content:'error: resolveTicketInteraction, embed does not contain footer',ephemeral:true});
 
+        interaction.message.edit({embeds:[generateTicketResolvedEmbed()],components:[]});
+
+        callTicketResponse(interaction.client, id).then(oldresponse => {
+            oldresponse.edit({embeds:[generateDmResolvedEmbed()],components:[]});
+            oldresponse.channel.send({embeds:[generateDmResolveEmbed(status)],components:[]}).then(newresponse => {
+                db.resolveTicket(id, statusToInt[status], newresponse.id, null).then(() => {
+                    return interaction.reply({content:'Ticket resolved. Feedback has been sent.',ephemeral:true});
+                });
+            });
+        });
+    });
+}
+
+// .block [mention|user_id] [hours]: MOD/GUILD/DM : blocks user from opening tickets
+function blockUser (message) {
+    isValid(message, message.user).then(valid => {
+        if (!valid) return;
+        var userid = parseMentionOrUser(message)
+        if (!userid) return message.reply('Could not identify user. `.block [mention|user_id] [hours]');
+        var hours = message.content.find(/(?<=\s)[0-9]+$/g);
+        try {
+            hours = parseInt(hours);
+        } catch {
+            var hours = 0;
+        }
+        db.blockUser(userid, hours).then(() => {
+            return message.react('✅');
+        }).catch(() => {
+            return message.react('❌');
+        });
+    });
 }
 
 // .unblock [member|user_id] : MOD/GUILD/DM : blocks user from opening tickets
-function blockUser (message) {
-
+function unblockUser (message) {
+    isValid(message, message.user).then(valid => {
+        if (!valid) return;
+        var userid = parseMentionOrUser(message)
+        if (!userid) return message.reply('Could not identify user. `.unblock [mention|user_id]');
+        db.unblockUser(userid).then(() => {
+            return message.react('✅');
+        }).catch(() => {
+            return message.react('❌');
+        });
+    });
 }
 
 // .blocked : MOD/GUILD/DM : dm's a list of blocked users
 function listBlocked (message) {
-
+    
 }
 
-function editTicket (message) {
-
-}
-
-function reopenTicket (message) {
-
+function reopenTicket (interaction) {
+    
 }
 
 function cancelTicket (ticketid) {
@@ -247,16 +321,16 @@ function cancelTicket (ticketid) {
 //
 //////////////////////////////////////////////////////////
 // Sub Level Functions
-function isValid (message) {
+function isValid (interaction, user) {
     return new Promise((resolve) => {
-        if (message.member) {
-            if (config.ModeratorRoleID.some((r)=> message.member.roles.cache.has(r))) {
+        if (interaction.member) {
+            if (config.ModeratorRoleID.some((r)=> interaction.member.roles.cache.has(r))) {
                 resolve(true);
             } else {
                 resolve(false);
             }
-        } else if (message.author) {
-            fetchPrivlege(message.client, message.author).then(valid => {
+        } else if (user) {
+            fetchPrivlege(interaction.client, user).then(valid => {
                 if (valid) {
                     resolve(true);
                 } else {
@@ -362,6 +436,25 @@ function parseTicketId(command) {
         }
     } catch {
         return false;
+    }
+}
+
+function parseRemarks(command) {
+    try {
+        return command.match(/(?<=^\.[A-Za-z]+\s)([\s\S]+)/g)[0];
+    } catch {
+        return null;
+    }
+}
+
+function parseMentionOrUser(message) {
+    try {
+        var userid = message.mentions.users.firstKey();
+        if (!userid) {
+            return message.content.find(/(?<=^\.block+\s)([0-9]+)/g);
+        }
+    } catch {
+        return null;
     }
 }
 
