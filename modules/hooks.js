@@ -1,9 +1,11 @@
 //const config = require('../config.json');
 const config = require('../testing-config.json');
-const { getContactEmbed, generateDmRequestEmbed, generateDmSubmittedEmbed, generateDmResolveEmbed, generateDmExpiredEmbed, generateDmReplacedEmbed, generateTicketEditingEmbed, generateTicketResolvedEmbed, getContactAction, generateDmRequestAction, generateDmEditAction, generateDmReopenAction, generateTicketEmbed, generateTicketAction, generateDmResolvedEmbed, statusToInt, intToStatus} = require('./source.js');
+const { getContactEmbed, generateDmRequestEmbed, generateDmSubmittedEmbed, generateDmExpiredEmbed, generateDmReplacedEmbed, generateDmBlockedEmbed, generateTicketEditingEmbed, generateTicketResolvedEmbed, generateDmClosedEmbed, getContactAction, generateDmRequestAction, generateDmEditAction, generateTicketEmbed, generateTicketAction, generateDmResolvedEmbed, generateTicketClosedEmbed } = require('./source.js');
 const db = require('./database.js');
 
 function Hooks(client) {
+    const expiration = expiryTimeout(client);
+
     client.on('messageCreate', message => {
         if (message.author == client) return;
         const content = message.content;
@@ -20,20 +22,23 @@ function Hooks(client) {
                 case '.block':
                     blockUser(message);
                     break;
-                case '.block':
+                case '.unblock':
                     unblockUser(message);
                     break;
                 case '.blocked':
                     listBlocked(message);
                     break;
                 case '.accept':
-                    resolveTicket(message, 'ACCEPTED');
+                    resolveTicket(message, 5);
                     break;
                 case '.deny':
-                    resolveTicket(message, 'DENIED');
+                    resolveTicket(message, 6);
                     break;
                 case '.resolve':
-                    resolveTicket(message, 'RESOLVED');
+                    resolveTicket(message, 4);
+                    break;
+                case '.close':
+                    closeTicket(message);
                     break;
             }
         } else {
@@ -43,7 +48,8 @@ function Hooks(client) {
                         db.setComment(result.ticketid, message.author.id, content.substring(0, 500)).then(() => {
                             message.channel.messages.fetch(result.responseid).then(response => {
                                 if (response.embeds.length < 1) return;
-                                response.edit({embeds:[response.embeds[0].setDescription(content.substring(0, 500))]}).then(() => {
+                                result.comment = content.substring(0, 500);
+                                response.edit({embeds:[generateDmRequestEmbed(result)]}).then(() => {
                                     message.react('✅');
                                 });
                             }).catch(error => console.log(error));
@@ -85,7 +91,12 @@ function Hooks(client) {
             }
 
             db.setType(id, interaction.user.id, type).then(() => {
-                return interaction.reply({content:'Changed type to ' + type + '. Please send a message via the message bar below and tell us how we can help you. (Max 500 Characters)', ephemeral:true});
+                 db.getRequest(interaction.user.id).then(result => {
+                    if (!result) return; 
+                    interaction.message.edit({embeds:[generateDmRequestEmbed(result)]}).then(() => {
+                        return interaction.reply({content:'Changed ticket type to ' + type, ephemeral:true});
+                    }).catch(error => console.log(error));
+                });
             }).catch(error => {
                 switch(error) {
                     case 'INVALID_USER':
@@ -93,31 +104,10 @@ function Hooks(client) {
                     case 'NO_TICKET':
                         return interaction.reply({content:'Failed to identify ticket, please request a new one.\nIf this problem persists please contact a moderator directly', ephemeral:true});
                 }
-            });
-        } else if (interaction.customId.includes('SubmitTicket')) {
-            // check if ready to submit
-            if (!interaction.isButton()) return;
-            const id = parseTicketId(interaction.customId);
-            if (!id) return interaction.reply({content:'Failed to identify ticket, please request a new one.\nIf this problem persists please contact a moderator directly', ephemeral:true});
+            });;
             
-            db.getTicket(id).then(async result => {
-                if (!result || !result.status || (result.status != 1 && result.status != 3)) return;
-                if (!result.type) return interaction.reply({content:'Please set an appeal type.', ephemeral:true});
-                if (!result.comment) return interaction.reply({content:'Please send a message via the message bar below and tell us how we can help you. (Max 500 Characters)', ephemeral:true});
-                fetchTicketChannel(client).then(async channel => {
-                    if (result.messageid) {
-                        var ticket = await channel.messages.fetch(result.messageid);
-                        await ticket.edit({embeds:[generateTicketEmbed(id.toString())],components:generateTicketAction()});
-                    } else {
-                        var ticket = await channel.send({embeds:[generateTicketEmbed(id.toString())],components:generateTicketAction()});
-                    }
-
-                    db.submitTicket(id, interaction.user.id, ticket.id).then(() => {
-                        interaction.reply({content:'Submitted ticket! Someone from our mod team will review your request shortly.', ephemeral:true});
-                        interaction.message.edit({embeds:[generateDmSubmittedEmbed()],components:generateDmEditAction(id)});
-                    });
-                });
-            });
+        } else if (interaction.customId.includes('SubmitTicket')) {
+            submitTicket(interaction);
         } else if (interaction.customId.includes('EditTicket')) {
             if (!interaction.isButton()) return;
             const id = parseTicketId(interaction.customId);
@@ -127,40 +117,73 @@ function Hooks(client) {
                 db.setStatus(id, interaction.user.id, 3).then(() => {
                     fetchTicketMessage(client, result.messageid).then(ticket => {
                         ticket.edit({embeds:[generateTicketEditingEmbed()],components:[]});
-                    })
-                    
-                    interaction.message.edit({embeds:[generateDmRequestEmbed()],components:generateDmRequestAction(id)}).then(() => {
+                    });
+                    result.status = 3;
+                    interaction.message.edit({embeds:[generateDmRequestEmbed(result)],components:generateDmRequestAction(id)}).then(() => {
                         return interaction.reply({content:'Your ticket is now being edited.', ephemeral:true});
                     });
                 });
             });
-        } 
+        } else if (interaction.customId.includes('CancelTicket')) {
+            cancelTicket(interaction);
+        }
     });
 }
 //////////////////////////////////////////////////////////
 // Top Level Functions
 
 function openTicket(interaction) { //  I think this control flow is good for now
-    db.getRequest(interaction.user.id).then(async result => {
-        if (result && result.ticketid) { 
-            var ticketid = result.ticketid;
-            const response = await callTicketResponse(interaction.client, result.ticketid);
-            if (!response) return;
-            await response.edit({embeds:[generateDmReplacedEmbed()],components:[]});
-            if (result.status == 1) await db.resetRequest(ticketid, interaction.user.id);
-        } else {
-            var ticketid = await db.createRequest(interaction.user.id, result.responseid);
-        }
-        interaction.user.send({embeds:[generateDmRequestEmbed()], components:generateDmRequestAction(ticketid)}).then(async message => {
-            db.setResponse(ticketid, interaction.user.id, message.id);
-            interaction.reply({content:'Please continue your ticket request in DMs.',ephemeral:true});
+    db.isBlocked(interaction.user.id).then(blocked => {
+        if (blocked) return interaction.reply({content:'You\'re blocked from creating new tickets.',ephemeral:true});;
+        interaction.user.send({embeds:[generateDmRequestEmbed({status: 1})]}).then(async message => {
+            db.getRequest(interaction.user.id).then(async result => {
+                if (result && result.ticketid) { 
+                    var ticketid = result.ticketid;
+                    const response = await fetchTicketResponse(interaction.client, result.userid, result.responseid);
+                    if (response) await response.edit({embeds:[generateDmReplacedEmbed()],components:[]});;
+                    if (result.status == 1) await db.resetRequest(ticketid, interaction.user.id);
+                } else {
+                    result = {status:1};
+                    var ticketid = await db.createRequest(interaction.user, message.id);
+                }
+                message.edit({embeds:[generateDmRequestEmbed(result)],components:generateDmRequestAction(ticketid)});
+                interaction.reply({content:'Please continue your ticket request in DMs.',ephemeral:true});
+            });
+        }).catch(() => {
+            interaction.reply({content:'Your DMs need to be open in order to request a ticket.',ephemeral:true});
+        });
+    });
+}
+
+function submitTicket(interaction) {
+    if (!interaction.isButton()) return;
+    const id = parseTicketId(interaction.customId);
+    if (!id) return interaction.reply({content:'Failed to identify ticket, please request a new one.\nIf this problem persists please contact a moderator directly', ephemeral:true});
+    
+    db.getTicket(id).then(async result => {
+        if (!result || !result.status || (result.status != 1 && result.status != 3)) return;
+        if (!result.type) return interaction.reply({content:'Please set an appeal type.', ephemeral:true});
+        if (!result.comment) return interaction.reply({content:'Please send a message via the message bar below and tell us how we can help you. (Max 500 Characters)', ephemeral:true});
+        result.status = 2;
+        fetchTicketChannel(interaction.client).then(async channel => {
+            if (result.messageid) {
+                var ticket = await channel.messages.fetch(result.messageid);
+                await ticket.edit({embeds:[generateTicketEmbed(result)],components:generateTicketAction()});
+            } else {
+                var ticket = await channel.send({embeds:[generateTicketEmbed(result)],components:generateTicketAction()});
+            }
+
+            db.submitTicket(id, interaction.user.id, ticket.id).then(() => {
+                interaction.reply({content:'Submitted ticket! Someone from our mod team will review your request shortly.', ephemeral:true});
+                interaction.message.edit({embeds:[generateDmSubmittedEmbed(result)],components:generateDmEditAction(id)});
+            });
         });
     });
 }
 
 // .sendcontact : MOD/GUILD/DM : resends the contact embed
 function sendSupportContact (message) {
-    isValid(message, message.user).then(valid => {
+    isValid(message, message.author).then(valid => {
         if (!valid) return;
         message.client.channels.fetch(config.SupportChannelID).then(channel => {
             if (!channel) return;
@@ -180,7 +203,7 @@ function sendSupportContact (message) {
 
 // .updatecontact : MOD/GUILD/DM : updates the contact embed to current configuration
 function updateSupportContact (message) {
-    isValid(message, message.user).then(valid => {
+    isValid(message, message.author).then(valid => {
         if (!valid) return;
         message.client.channels.fetch(config.SupportChannelID).then(channel => { // Fetch support chanmel
             if (!channel) return message.react('❌');
@@ -188,7 +211,7 @@ function updateSupportContact (message) {
                 if (!messages) return message.react('❌');
                 for (const channel_message of messages.toJSON()) { // Iterate all messages
                     if (!channel_message.components) continue;
-                    for (message_component of channel_message.components) { // Iterate all components
+                    for (const message_component of channel_message.components) { // Iterate all components
                         if (message_component.components.length > 0 && message_component.components[0].customId == 'OpenTicket') { // Check if component matches requestTicket
                             return channel_message.edit({embeds:[getContactEmbed()],components:getContactAction()}).then(contact => { // Update message configuration
                                 if (contact) {
@@ -214,7 +237,7 @@ function updateSupportContact (message) {
 // .deny [message] : MOD/GUILD_REPLY : denies the replied ticket and sends the user a message through dm anonymously
 // .resolve [message] : MOD/GUILD_REPLY : resolves the replied ticket and sends the user a message through dm anonymously
 function resolveTicket (message, status) {
-    isValid(message, message.user).then(valid => {
+    isValid(message, message.author).then(valid => {
         if (!valid) return;
         try {
             var ticket = message.reference.messageId;
@@ -224,22 +247,32 @@ function resolveTicket (message, status) {
         
         message.channel.messages.fetch(ticket).then(ticketmessage => {
             if (ticketmessage.embeds.length < 0) return message.react('❌');  
-            try { 
-                var id = parseInt(ticketmessage.embeds[0].footer.text); 
-            } catch {
-                return message.react('❌');
-            }
+            const id = parseInt(ticketmessage.embeds[0].footer.text); 
             if (!id) return message.react('❌');
-            
-            ticketmessage.edit({embeds:[generateTicketResolvedEmbed()],components:[]});
 
-            callTicketResponse(message.client, id).then(oldresponse => {
-                oldresponse.edit({embeds:[generateDmResolvedEmbed()],components:[]});
-                const remarks = parseRemarks(message.content);
-                oldresponse.channel.send({embeds:[generateDmResolveEmbed(status, remarks)],components:[]}).then(newresponse => {
-                    db.resolveTicket(id, statusToInt[status], newresponse.id, remarks).then(() => {
-                        return message.react('✅');
+            db.getTicket(id).then(result => {
+                result.remarks = parseRemarks(message.content);
+                result.status = status;
+                if (message.author) {
+                    if (message.author.username) {
+                        var author = message.author.username;
+                    } else if (message.author.id) {
+                        var author = 'moderator. ID = ' + message.author.id;
+                    } else {
+                        var author = 'moderator'
+                    }
+                } else {
+                    var author = 'moderator'  
+                }
+                ticketmessage.edit({embeds:[generateTicketResolvedEmbed(result, author)],components:[]});
+
+                fetchTicketResponse(message.client, result.userid, result.responseid).then(response => {
+                    response.delete().then(() => {
+                        db.deleteTicket(id).then(() => {
+                            return message.delete();
+                        });
                     });
+                    response.channel.send({embeds:[generateDmResolvedEmbed(result)]});
                 });
             });
         });
@@ -251,20 +284,28 @@ function resolveTicketInteraction (interaction, status) {
     isValid(interaction, interaction.user).then(valid => {
         if (!valid) return;
         if (interaction.message.embeds.length < 0) return interaction.reply({content:'error: resolveTicketInteraction, message does not contain embeds',ephemeral:true});  
-        try { 
-            var id = parseInt(interaction.message.embeds[0].footer.text); 
-        } catch {
-            return interaction.reply({content:'error: resolveTicketInteraction, embed does not contain footer',ephemeral:true});
-        }
+        const id = parseInt(interaction.message.embeds[0].footer.text); 
         if (!id) return interaction.reply({content:'error: resolveTicketInteraction, embed does not contain footer',ephemeral:true});
 
-        interaction.message.edit({embeds:[generateTicketResolvedEmbed()],components:[]});
+        db.getTicket(id).then(result => {
+            result.status = status;
+            if (interaction.user) {
+                if (interaction.user) {
+                    var author = interaction.user.username;
+                } else if (interaction.user.id) {
+                    var author = 'moderator. ID = ' + interaction.user.id;
+                } else {
+                    var author = 'moderator'
+                }
+            } else {
+                var author = 'moderator'  
+            }
+            interaction.message.edit({embeds:[generateTicketResolvedEmbed(result, author)],components:[]});
 
-        callTicketResponse(interaction.client, id).then(oldresponse => {
-            oldresponse.edit({embeds:[generateDmResolvedEmbed()],components:[]});
-            oldresponse.channel.send({embeds:[generateDmResolveEmbed(status)],components:[]}).then(newresponse => {
-                db.resolveTicket(id, statusToInt[status], newresponse.id, null).then(() => {
-                    return interaction.reply({content:'Ticket resolved. Feedback has been sent.',ephemeral:true});
+            fetchTicketResponse(interaction.client, result.userid, result.responseid).then(response => {
+                response.delete();
+                response.channel.send({embeds:[generateDmResolvedEmbed(result)],components:[]}).then(() => {
+                    db.deleteTicket(id);
                 });
             });
         });
@@ -273,27 +314,33 @@ function resolveTicketInteraction (interaction, status) {
 
 // .block [mention|user_id] [hours]: MOD/GUILD/DM : blocks user from opening tickets
 function blockUser (message) {
-    isValid(message, message.user).then(valid => {
+    isValid(message, message.author).then(valid => {
         if (!valid) return;
         var userid = parseMentionOrUser(message)
-        if (!userid) return message.reply('Could not identify user. `.block [mention|user_id] [hours]');
-        var hours = message.content.find(/(?<=\s)[0-9]+$/g);
-        try {
-            hours = parseInt(hours);
-        } catch {
-            var hours = 0;
-        }
+        if (!userid) return message.reply('Could not identify user. `.block [mention|user_id] [hours]`');
+        var hours = message.content.match(/(?<=\s)[0-9]+$/g);
+        hours = parseInt(hours);
+        if (!hours) hours = 0;
+
         db.blockUser(userid, hours).then(() => {
             return message.react('✅');
         }).catch(() => {
             return message.react('❌');
+        });
+
+        db.getRequest(userid).then(result => {
+            if (result && result.status == 1 && result.responseid) {
+                fetchTicketResponse(message.client, userid, result.responseid).then(response => {
+                    response.edit({embeds:[generateDmBlockedEmbed()],components:[]});
+                });
+            }
         });
     });
 }
 
 // .unblock [member|user_id] : MOD/GUILD/DM : blocks user from opening tickets
 function unblockUser (message) {
-    isValid(message, message.user).then(valid => {
+    isValid(message, message.author).then(valid => {
         if (!valid) return;
         var userid = parseMentionOrUser(message)
         if (!userid) return message.reply('Could not identify user. `.unblock [mention|user_id]');
@@ -310,14 +357,86 @@ function listBlocked (message) {
     
 }
 
-function reopenTicket (interaction) {
-    
+function cancelTicket (interaction) {
+    if (!interaction.isButton()) return;
+    const id = parseTicketId(interaction.customId);
+    if (!id) return interaction.reply({content:'Failed to identify ticket, please request a new one.\nIf this problem persists please contact a moderator directly', ephemeral:true});
+
+    db.getTicket(id).then(async result => {
+        if (!result || result.userid != interaction.user.id) return;
+        db.deleteTicket(id).then(() => {
+            interaction.reply({content:'Successfully cancelled ticket.',ephemeral:true});
+        });
+        result.status = 7;
+        await interaction.message.edit({embeds:[generateDmRequestEmbed(result)],components:[]});
+        if (result.messageid) {
+            await fetchTicketMessage(interaction.client, result.messageid).then(message => {
+                message.edit({embeds:[generateTicketEmbed(result)],components:[]});
+            });
+        }
+    });
 }
 
-function cancelTicket (ticketid) {
-
+function closeTicket (message) {
+    isValid(message, message.author).then(valid => {
+        if (!valid) return;
+        try {
+            var ticket = message.reference.messageId;
+        } catch {
+            return message.react('❌');
+        }
+        message.channel.messages.fetch(ticket).then(ticketmessage => {
+            if (ticketmessage.embeds.length < 0) return message.react('❌');  
+            try { 
+                var id = parseInt(ticketmessage.embeds[0].footer.text); 
+            } catch {
+                return message.react('❌');
+            }
+            if (!id) return message.react('❌');
+            db.getTicket(id).then(result => {
+                db.deleteTicket(id).then(() => {
+                    const remarks = parseRemarks(message.content);
+                    if (message.author) {
+                        if (message.author.username) {
+                            var author = message.author.username;
+                        } else if (message.author.id) {
+                            var author = 'moderator. ID = ' + message.author.id;
+                        } else {
+                            var author = 'moderator'
+                        }
+                    } else {
+                        var author = 'moderator'  
+                    }
+                    ticketmessage.edit({embeds:[generateTicketClosedEmbed({user:author,remarks:remarks})],components:[]});
+                    fetchTicketResponse(message.client, result.userid, result.responseid).then(response => { // 
+                        response.edit({embeds:[generateDmClosedEmbed(remarks)],components:[]}).then(() => {
+                            return message.delete();
+                        });
+                    });
+                });
+            });
+        });
+    });
 }
 
+function expiryTimeout(client) {
+    db.expiredTickets().then(rows => {
+        for (let row of rows) {
+            db.deleteTicket(row.ticketid).then(() => {
+                fetchTicketResponse(client, row.userid, row.responseid).then(response=>{
+                    response.edit({embeds:[generateDmExpiredEmbed()],components:[]});
+                });
+            });
+        }
+    });
+
+    db.expiredBlocks().then(rows => {
+        for (let row of rows) {
+            db.unblockUser(row.userid);
+        }
+    });
+    return setTimeout(function(){expiryTimeout()}, 3600000);
+}
 //
 //////////////////////////////////////////////////////////
 // Sub Level Functions
@@ -451,7 +570,9 @@ function parseMentionOrUser(message) {
     try {
         var userid = message.mentions.users.firstKey();
         if (!userid) {
-            return message.content.find(/(?<=^\.block+\s)([0-9]+)/g);
+            return message.content.match(/(?<=^\.block+\s)([0-9]+)/g);
+        } else {
+            return userid;
         }
     } catch {
         return null;

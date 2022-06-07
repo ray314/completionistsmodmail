@@ -1,5 +1,26 @@
 const { MessageEmbed, MessageActionRow, MessageButton, MessageSelectMenu, TextInputComponent, Message} = require('discord.js');
 
+const intToStatus = {
+    1: "REQUESTED",
+    2: "PENDING",
+    3: "EDITING",
+    4: "RESOLVED",
+    5: "ACCEPTED",
+    6: "DENIED",
+    7: "CANCELLED BY USER",
+    8: "CLOSED"
+};
+const statusToInt = {
+    "REQUESTED": 1,
+    "PENDING": 2,
+    "EDITING": 3,
+    "RESOLVED": 4,
+    "ACCEPTED": 5,
+    "DENIED": 6,
+    "CANCELLED": 7,
+    "CLOSED": 8
+};
+
 // -- EMBEDS -- \\
 function getContactEmbed() {
     return new MessageEmbed()
@@ -7,32 +28,37 @@ function getContactEmbed() {
     .setDescription('Click the button below to request a support ticket!\nMake sure you\'ve read everything here first.');
 }
 
-function generateDmRequestEmbed() {
+function generateDmRequestEmbed(params) {
+    params.status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
+    if (!params.type) params.type = 'Please set type';
+    if (!params.comment) params.comment = 'Enter your comment via the message bar (Max: 500)'; 
     return new MessageEmbed()
-        .setDescription('Test');
+        .setDescription('Status = '+ params.status +'\n\nType = '+params.type+'\n\nComment = '+params.comment)
+        .setTimestamp();
 }
 
-function generateDmSubmittedEmbed() {
+function generateDmSubmittedEmbed(params) {
+    params.status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
+    if (!params.type) params.type = 'Please set type';
+    if (!params.comment) params.comment = 'Enter your comment via the message bar (Max: 500)'; 
     return new MessageEmbed()
-        .setDescription('Submitted');
+        .setDescription('Status = PENDING\n\nType = '+params.type+'\n\nComment = '+params.comment)
+        .setTimestamp();
 }
 
-function generateDmResolvedEmbed() { // old response (no information)
+function generateDmResolvedEmbed(params) { // new response ()
+    if (!params.status) params.status = 'UNKNOWN';
+    if (!params.type) params.type = 'UNKNOWN';
+    if (!params.remarks) params.remarks = '*no remarks*';
     return new MessageEmbed()
-    .setColor('#d6b3f2')
-    .setDescription('*ticket has been resolved*');
-}
-
-function generateDmResolveEmbed(status, remarks) { // new response ()
-    var description = '*ticket is resolve status' + status;
-    if (remarks) description += 'Remarks: ' + remarks;
-    return new MessageEmbed()
-    .setColor('#d6b3f2')
-    .setDescription(description);
+        .setDescription('Status = '+params.status+'\n\nType = '+params.type+'\n\nModerator Reply = '+params.remarks)
+        .setTimestamp();
 }
 
 function generateDmExpiredEmbed() {
-    
+    return new MessageEmbed()
+    .setColor('#d6b3f2')
+    .setDescription('*ticket request has expired*');
 }
 
 function generateDmReplacedEmbed() {
@@ -41,23 +67,64 @@ function generateDmReplacedEmbed() {
     .setDescription('*ticket cancelled by another ticket*');
 }
 
-function generateTicketEmbed(id) {
+function generateDmCancelledEmbed() {
     return new MessageEmbed()
     .setColor('#d6b3f2')
-    .setDescription('This is a ticket embed')
-    .setFooter({text:id});
+    .setDescription('*ticket was cancelled*');
+}
+
+function generateDmBlockedEmbed() {
+    return new MessageEmbed()
+    .setColor('#d6b3f2')
+    .setDescription('*You\'ve been blocked from creating new tickets*');
+}
+
+function generateDmClosedEmbed(remarks) {
+    let desc = '*ticket forcefully closed by moderator*'
+    if (remarks) desc += '\n"' + remarks + '"';
+    return new MessageEmbed()
+    .setColor('#d6b3f2')
+    .setDescription(desc);
+}
+
+function generateTicketEmbed(params) {
+    if (!params.ticketid) return;
+    if (!params.name) params.name = 'UNKNOWN';
+    params.status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
+    if (!params.type) params.type = 'UNKNOWN';
+    if (!params.comment) params.comment = 'UNKNOWN';
+    return new MessageEmbed()
+    .setAuthor({name: params.name, iconURL: params.iconurl})
+    .setDescription('Status = '+params.status+'\n\nType ='+params.type+'\n\nComment = '+params.comment)
+    .setFooter({text:params.ticketid.toString()});
 }
 
 function generateTicketEditingEmbed() {
     return new MessageEmbed()
     .setColor('#d6b3f2')
-    .setDescription('*Ticket is currently being edited*');
+    .setDescription('*ticket is currently being edited*');
 }
 
-function generateTicketResolvedEmbed() {
+function generateTicketResolvedEmbed(params, author) {
+    if (!params.ticketid) return;
+    if (!params.name) params.name = 'UNKNOWN';
+    params.status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
+    if (!params.type) params.type = 'UNKNOWN';
+    if (!params.comment) params.comment = 'UNKNOWN';
+    if (!params.remarks) params.remarks = '*no remarks*'; 
+    return new MessageEmbed()
+    .setAuthor({name: params.name, iconURL: params.iconurl})
+    .setDescription('Status = '+params.status+' by ' + author +'\n\nType ='+params.type+'\n\nComment = '+params.comment+'\n\n'+'Reply = '+params.remarks)
+    .setFooter({text:params.ticketid.toString()});
+}
+
+function generateTicketClosedEmbed(params) {
+    if (!params.user) params.user = 'moderator';
+    let desc = '*ticket forcefully closed by ' + params.user + '*';
+    if (params.remarks) desc += '"\n' + params.remarks + '"';
     return new MessageEmbed()
     .setColor('#d6b3f2')
-    .setDescription('*ticket is resolve');
+    .setDescription(desc);
 }
 
 // -- ACTIONS -- \\
@@ -81,7 +148,11 @@ function generateDmRequestAction(id) {
         new MessageButton()
             .setCustomId('SubmitTicket-'+id)
             .setLabel('Submit')
-            .setStyle('PRIMARY')
+            .setStyle('PRIMARY'),
+        new MessageButton()
+            .setCustomId('CancelTicket-'+id)
+            .setLabel('Cancel')
+            .setStyle('DANGER')
     )];
 }
 
@@ -90,17 +161,11 @@ function generateDmEditAction(id) {
         new MessageButton()
             .setCustomId('EditTicket-'+id)
             .setLabel('Edit')
-            .setStyle('PRIMARY')
-        )
-    ];
-}
-
-function generateDmReopenAction() {
-    return [ new MessageActionRow().addComponents(
+            .setStyle('PRIMARY'),
         new MessageButton()
-            .setCustomId('ReopenTicket-'+id)
-            .setLabel('Reopen')
-            .setStyle('PRIMARY')
+            .setCustomId('CancelTicket-'+id)
+            .setLabel('Cancel')
+            .setStyle('DANGER')
         )
     ];
 }
@@ -128,31 +193,17 @@ module.exports = {
     generateDmRequestEmbed,
     generateDmSubmittedEmbed,
     generateDmResolvedEmbed,
-    generateDmResolveEmbed,
     generateDmExpiredEmbed,
     generateDmReplacedEmbed,
+    generateDmCancelledEmbed,
+    generateDmBlockedEmbed,
+    generateDmClosedEmbed,
     generateTicketEmbed,
     generateTicketEditingEmbed,
     generateTicketResolvedEmbed,
+    generateTicketClosedEmbed,
     getContactAction,
     generateDmRequestAction,
     generateDmEditAction,
-    generateDmReopenAction,
-    generateTicketAction,
-    intToStatus: {
-        1: "REQUESTED",
-        2: "PENDING",
-        3: "EDITING",
-        4: "RESOLVED",
-        5: "ACCEPTED",
-        6: "DENIED"
-    }, 
-    statusToInt: {
-        "REQUESTED": 1,
-        "PENDING": 2,
-        "EDITING": 3,
-        "RESOLVED": 4,
-        "ACCEPTED": 5,
-        "DENIED": 6
-    }
+    generateTicketAction
 };
