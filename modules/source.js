@@ -21,15 +21,15 @@ const intToStatus = {
     "CLOSED": 8
 };*/
 const statusToUrl = {
-    Requested: "REQUESTED",
-    Pending: "PENDING",
-    Editing: "EDITING",
-    Resolved: "RESOLVED",
-    Accepted: "ACCEPTED",
-    Denied: "DENIED",
-    Cancelled: "CANCELLED",
-    Closed: "CLOSED",
-    Unknown: "somewhere"
+    Requested: "https://raw.githubusercontent.com/mattmular/completionistsmodmail/main/data/requested.png",
+    Pending: "https://raw.githubusercontent.com/mattmular/completionistsmodmail/main/data/pending.png",
+    Editing: "https://raw.githubusercontent.com/mattmular/completionistsmodmail/main/data/editing.png",
+    Resolved: "https://raw.githubusercontent.com/mattmular/completionistsmodmail/main/data/resolved.png",
+    Accepted: "https://raw.githubusercontent.com/mattmular/completionistsmodmail/main/data/accepted.png",
+    Denied: "https://raw.githubusercontent.com/mattmular/completionistsmodmail/main/data/denied.png",
+    Cancelled: "https://raw.githubusercontent.com/mattmular/completionistsmodmail/main/data/cancelled.png",
+    Closed: "https://raw.githubusercontent.com/mattmular/completionistsmodmail/main/data/closed.png",
+    Unknown: "https://raw.githubusercontent.com/mattmular/completionistsmodmail/main/data/unknown.png"
 }
 
 const statusToColor = {
