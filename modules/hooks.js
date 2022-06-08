@@ -1,10 +1,5 @@
-<<<<<<< HEAD
 const config = require('../config.json');
 //const config = require('../testing-config.json');
-=======
-//const config = require('../config.json');
-const config = require('../testing-config.json');
->>>>>>> 6818325d057473bed382db077a0118476481324c
 const { getContactEmbed, generateDmRequestEmbed, generateDmSubmittedEmbed, generateDmExpiredEmbed, generateDmReplacedEmbed, generateDmBlockedEmbed, generateTicketResolvedEmbed, generateDmClosedEmbed, getContactAction, generateDmRequestAction, generateDmEditAction, generateTicketEmbed, generateTicketAction, generateDmResolvedEmbed, generateTicketClosedEmbed } = require('./source.js');
 const db = require('./database.js');
 
@@ -18,6 +13,11 @@ function Hooks(client) {
         if (content.substring(0, 1) === '.') {
         const command = content.split(' ');
             switch(command[0]) {
+                case '.modmail-help':
+                    isValid(message, message.author).then(() => {
+                        message.reply(config.Help);
+                    });
+                    break;
                 case '.sendcontact':
                     sendSupportContact(message);
                     break;
@@ -435,7 +435,7 @@ function expiryTimeout(client) {
     } catch (err) {
         console.log('Error H100: Expiry timeout.\n'+err);
     }
-    return setTimeout(function(){expiryTimeout(client)}, 10000);
+    return setTimeout(function(){expiryTimeout(client)}, 3600000);
 }
 //
 //////////////////////////////////////////////////////////
