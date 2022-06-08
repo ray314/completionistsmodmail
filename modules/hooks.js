@@ -71,11 +71,11 @@ function Hooks(client) {
         if (interaction.customId.includes('OpenTicket')) { 
             openTicket(interaction);            
         } else if (interaction.customId.includes('AcceptTicket')) {
-            resolveTicketInteraction(interaction, 'ACCEPTED');
+            resolveTicketInteraction(interaction, 'Accepted');
         }  else if (interaction.customId.includes('DenyTicket')) {
-            resolveTicketInteraction(interaction, 'DENIED');
+            resolveTicketInteraction(interaction, 'Denied');
         }  else if (interaction.customId.includes('ResolveTicket')) {
-            resolveTicketInteraction(interaction, 'RESOLVED');
+            resolveTicketInteraction(interaction, 'Resolved');
         } else if (interaction.customId.includes('SetType')) {
             if (!interaction.isSelectMenu()) return;
             const typeErrorReply = 'Failed to submit type, please request a new ticket.\nIf this problem persists please contact a moderator directly.\n';
@@ -158,8 +158,8 @@ function submitTicket(interaction) {
         if (!result.type) return interaction.reply({content:'Please set an appeal type.', ephemeral:true});
         if (!result.comment) return interaction.reply({content:'Please send a message via the message bar below and tell us how we can help you. (Max 500 Characters)', ephemeral:true});
         result.status = 2;
-        fetchTicketChannel(interaction.client).then(async channel => {
-            db.submitTicket(id, interaction.user.id, ticket.id).then(() => {
+        fetchTicketChannel(interaction.client).then(channel => {
+            db.submitTicket(id, interaction.user.id, ticket.id).then(async () => {
                 if (result.messageid) {
                     var ticket = await channel.messages.fetch(result.messageid).catch(error => console.log('Error H074: Failed to fetch ticket message.\n'+error));
                     await ticket.edit({embeds:[generateTicketEmbed(result)],components:generateTicketAction(id)}).catch(error => console.log('Error H075: Failed to edit ticket message.\n'+error));
