@@ -2,7 +2,7 @@ const EXPIRE = 1 // time in hours before a requested ticket expires or a resolve
 
 const sqlite3 = require('sqlite3').verbose();
 var db = new sqlite3.Database('./database/tickets.db');
-db.run('CREATE TABLE IF NOT EXISTS TICKETS(ticketid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, userid TEXT NOT NULL, name TEXT, iconurl TEXT, status INTEGER NOT NULL, type TEXT, comment TEXT, remarks TEXT, messageid TEXT, responseid TEXT, expire INTEGER)');
+db.run('CREATE TABLE IF NOT EXISTS TICKETS(ticketid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, userid TEXT NOT NULL, name TEXT, iconurl TEXT, status INTEGER NOT NULL, type TEXT, comment TEXT, remarks TEXT, messageid TEXT, responseid TEXT NOT NULL, expire INTEGER)');
 db.run('CREATE TABLE IF NOT EXISTS BLOCKED(userid TEXT PRIMARY KEY NOT NULL UNIQUE, expire INTEGER NOT NULL)');
 
 // Checks if user owns the ticket.
@@ -31,10 +31,10 @@ module.exports = {
 
         });
     },
-    resetRequest: function(ticketid, userid) {
+    resetRequest: function(ticketid, userid, responseid) {
         return new Promise((resolve, reject) => {
             isOwner(ticketid, userid).then(() => {
-                db.run('UPDATE TICKETS SET status=1, type=NULL, comment=NULL, remarks=NULL, messageid=NULL, responseid=NULL, expire=? WHERE ticketid=?', [new Date().getTime()+(EXPIRE*3600000), ticketid], function(err) {
+                db.run('UPDATE TICKETS SET status=1, type=NULL, comment=NULL, remarks=NULL, messageid=NULL, responseid=?, expire=? WHERE ticketid=?', [responseid, new Date().getTime()+(EXPIRE*3600000), ticketid], function(err) {
                     if (err) {
                         return reject(err);
                     }
@@ -44,7 +44,7 @@ module.exports = {
         });
     },
     getTicket: function(ticketid) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             db.get('SELECT * FROM TICKETS WHERE ticketid=?', [ticketid], function(err, result) {
                 if (result) {
                     return resolve(result);
@@ -60,13 +60,13 @@ module.exports = {
                 if (result) {
                     return resolve(result);
                 } else {
-                    return reject(err);
+                    return resolve(null);
                 }
             });
         });
     },
     getMessage: function(ticketid) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             db.get('SELECT ticketid id, userid user, messageid message FROM TICKETS WHERE ticketid=?', [ticketid], function(err, result) {
                 if (result) {
                     return resolve(result);
@@ -159,7 +159,7 @@ module.exports = {
         });
     },*/
     deleteTicket: function(ticketid) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             db.run('DELETE FROM TICKETS WHERE ticketid=?', [ticketid], function(err) {
                 if (err) {
                     return reject(err);
@@ -170,7 +170,7 @@ module.exports = {
         });
     },
     blockUser: function(userid, expire) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             db.run('INSERT INTO BLOCKED(userid,expire) VALUES(?,?)', [userid, expire], function(err) {
                 if (err) {
                     db.run('UPDATE BLOCKED SET expire=? WHERE userid=?', [expire,userid], function(err) {
@@ -196,7 +196,7 @@ module.exports = {
         });
     },
     unblockUser: function(userid) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             db.run('DELETE FROM BLOCKED WHERE userid=?', [userid], function(err) {
                 if (err) {
                     reject(err);
@@ -207,7 +207,7 @@ module.exports = {
     },
     expiredTickets: function() {
         const time = new Date().getTime();
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             db.all('SELECT * FROM TICKETS WHERE status=1 AND expire<=? AND expire!=0', [time], function(err, rows) {
                 if (rows) {
                     resolve(rows);
@@ -219,7 +219,7 @@ module.exports = {
     },
     expiredBlocks: function() {
         const time = new Date().getTime();
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             db.all('SELECT * FROM BLOCKED WHERE expire<=? AND expire!=0', [time], function(err, rows) {
                 if (rows) {
                     resolve(rows);

@@ -55,15 +55,14 @@ function getContactEmbed() {
 
 function generateDmRequestEmbed(params) {
     let title = params.status == 3 ? 'Editing Ticket' : 'Ticket Request';
-    params.status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
+    var status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
     if (!params.type) params.type = 'Please set type';
     if (!params.comment) params.comment = 'Enter your comment via the message bar (Max: 500)';
     return new MessageEmbed()
         .setTitle(title)
-        .color(statusToColor[params.status])
-        .setThumbnail(statusToUrl[params.status])
+        .setColor(statusToColor[status])
+        .setThumbnail(statusToUrl[status])
         .addFields(
-            { name: '\u200B', value: '\u200B' },
             { name: 'Type', value: params.type},  
             { name: 'Comment', value: params.comment},
         )
@@ -71,13 +70,13 @@ function generateDmRequestEmbed(params) {
 }
 
 function generateDmSubmittedEmbed(params) {
-    params.status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
+    var status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
     if (!params.type) params.type = 'Please set type';
     if (!params.comment) params.comment = 'Enter your comment via the message bar (Max: 500)'; 
     return new MessageEmbed()
         .setTitle(params.type)
-        .color(statusToColor[params.status])
-        .setThumbnail(statusToUrl[params.status])
+        .setColor(statusToColor[status])
+        .setThumbnail(statusToUrl[status])
         .setDescription(params.comment)
         .addFields(
             { name: '\u200B', value: '\u200B' },
@@ -86,18 +85,18 @@ function generateDmSubmittedEmbed(params) {
         .setTimestamp();
 }
 
-function generateDmResolvedEmbed(params) { // new response ()
-    params.status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
+function generateDmResolvedEmbed(params) { 
+    var status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
     if (!params.type) params.type = 'UNKNOWN';
     if (!params.remarks) params.remarks = '*no remarks*';
     return new MessageEmbed()
         .setTitle(params.type)
-        .color(statusToColor[params.status])
-        .setThumbnail(statusToUrl[params.status])
+        .setColor(statusToColor[status])
+        .setThumbnail(statusToUrl[status])
         .setDescription(params.comment)
         .addFields(
             { name: '\u200B', value: '\u200B' },
-            { name: 'Your Request was '+ params.status, value: '"' + params.remark + '"' }
+            { name: 'Your Request was '+ status, value: '"' + params.remarks + '"' }
         )
         .setTimestamp();
 }
@@ -130,21 +129,21 @@ function generateDmClosedEmbed(remarks) {
     let desc = '*ticket forcefully closed by moderator*'
     if (remarks) desc += '\n"' + remarks + '"';
     return new MessageEmbed()
-    .color(statusToColor.Closed)
+    .setColor(statusToColor.Closed)
     .setDescription(desc);
 }
 
 function generateTicketEmbed(params) {
     if (!params.ticketid) return console.log('Error S001: No TicketID found in params:\n' + params);
     if (!params.name) params.name = params.userid ? "ID: " + params.userid : "UNKNOWN";
-    params.status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
+    var status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
     if (!params.type) params.type = 'UNKNOWN';
     if (!params.comment) params.comment = 'UNKNOWN';
     return new MessageEmbed()
         .setAuthor({name: params.name, iconURL: params.iconurl})
         .setTitle(params.type)
-        .color(statusToColor[params.status])
-        .setThumbnail(statusToUrl[params.status])
+        .setColor(statusToColor[status])
+        .setThumbnail(statusToUrl[status])
         .setDescription(params.comment)
         .setFooter({text:params.ticketid.toString()})
         .setTimestamp();
@@ -152,27 +151,27 @@ function generateTicketEmbed(params) {
 
 function generateTicketEditingEmbed() {
     return new MessageEmbed()
-    .color(statusToColor.Editing)
+    .setColor(statusToColor.Editing)
     .setDescription('*ticket is currently being edited*');
 }
 
 function generateTicketResolvedEmbed(params, author) {
     if (!params.ticketid) return;
     if (!params.name) params.name = params.userid ? "ID: " + params.userid : "UNKNOWN";
-    params.status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
+    var status = params.status ? intToStatus[params.status] : 'UNKNOWN';
     if (!params.type) params.type = 'UNKNOWN';
     if (!params.comment) params.comment = 'UNKNOWN';
     if (!params.remarks) params.remarks = '*no remarks*'; 
     return new MessageEmbed()
         .setAuthor({name: params.name, iconURL: params.iconurl})
         .setTitle(params.type)
-        .color(statusToColor[params.status])
-        .setThumbnail(statusToUrl[params.status])
+        .setColor(statusToColor[status])
+        .setThumbnail(statusToUrl[status])
         .setDescription(params.comment)
         .setFooter({text:params.ticketid.toString()})
         .addFields(
             { name: '\u200B', value: '\u200B' },
-            { name: params.status + ' by ' + author, value: '"' + params.remark + '"' }
+            { name: status + ' by ' + author, value: '"' + params.remarks + '"' }
         )
         .setTimestamp();
 }
@@ -202,7 +201,7 @@ function generateDmRequestAction(id) {
             .setPlaceholder('Type')
             .setMinValues(1)
             .setMaxValues(1)
-            .addOptions([{label:'Appeal',value:'Report'},{label:'Report',value:'Report'},{label:'Other',value:'Report'}])
+            .addOptions([{label:'Appeal',value:'Appeal'},{label:'Report',value:'Report'},{label:'Other',value:'Other'}])
     ), new MessageActionRow().addComponents(
         new MessageButton()
             .setCustomId('SubmitTicket-'+id)

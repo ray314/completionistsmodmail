@@ -7,7 +7,7 @@ function Hooks(client) {
     const expiration = expiryTimeout(client);
 
     client.on('messageCreate', message => {
-        if (message.author == client) return;
+        if (message.author.bot) return;
         const content = message.content;
         if (!content) return;
         if (content.substring(0, 1) === '.') {
@@ -65,16 +65,16 @@ function Hooks(client) {
         if (interaction.customId.includes('OpenTicket')) { 
             openTicket(interaction);            
         } else if (interaction.customId.includes('AcceptTicket')) {
-            resolveTicketInteraction(interaction, 'Accepted');
+            resolveTicketInteraction(interaction, 5);
         }  else if (interaction.customId.includes('DenyTicket')) {
-            resolveTicketInteraction(interaction, 'Denied');
+            resolveTicketInteraction(interaction, 6);
         }  else if (interaction.customId.includes('ResolveTicket')) {
-            resolveTicketInteraction(interaction, 'Resolved');
+            resolveTicketInteraction(interaction, 4);
         } else if (interaction.customId.includes('SetType')) {
             if (!interaction.isSelectMenu()) return;
             const typeErrorReply = 'Failed to submit type, please request a new ticket.\nIf this problem persists please contact a moderator directly.\n';
             const id = parseTicketId(interaction.customId);
-            if (!id) return logErrorSafeReply(interaction, commentErrorReply+'`Error H047`', 'Error H047: Failed to identify ticket.\n'+error);
+            if (!id) return logErrorSafeReply(interaction, typeErrorReply+'`Error H047`', 'Error H047: Failed to identify ticket.\n'+error);
             if (interaction.values.length < 1) {
                 var type = NULL;
             } else {
@@ -82,13 +82,14 @@ function Hooks(client) {
             }
 
             db.getRequest(interaction.user.id).then(result => {
-                if (!result) return logErrorSafeReply(interaction, commentErrorReply+'`Error H049`', 'Error H049: Got null request object.\n'+error);
+                if (!result) return logErrorSafeReply(interaction, typeErrorReply+'`Error H049`', 'Error H049: Got null request object.\n'+error);
                 db.setType(id, interaction.user.id, type).then(() => { 
+                    result.type = type;
                     interaction.message.edit({embeds:[generateDmRequestEmbed(result)]}).then(() => {
                         return interaction.reply({content:'Changed ticket type to ' + type, ephemeral:true}).catch(error => console.log('Error H052: Failed to reply response.\n'+error));
                     }).catch(error => console.log('Error H051: Failed to edit response.\n'+error));
-                }).catch(error => logErrorSafeReply(interaction, commentErrorReply+'`Error H050`', 'Error H050: Failed to set type.\n'+error));
-            }).catch(error => logErrorSafeReply(interaction, commentErrorReply+'`Error H048`', 'Error H048: Failed to get request.\n'+error));
+                }).catch(error => logErrorSafeReply(interaction, typeErrorReply+'`Error H050`', 'Error H050: Failed to set type.\n'+error));
+            }).catch(error => logErrorSafeReply(interaction, typeErrorReply+'`Error H048`', 'Error H048: Failed to get request.\n'+error));
             
         } else if (interaction.customId.includes('SubmitTicket')) {
             submitTicket(interaction);
@@ -98,8 +99,8 @@ function Hooks(client) {
             const id = parseTicketId(interaction.customId);
             if (!id) return logErrorSafeReply(interaction, editErrorReply+'`Error H053`', 'Error H053: Failed to identify ticket.\n'+error);
             db.getTicket(id).then(result => {
-                if (!result) return logErrorSafeReply(interaction, commentErrorReply+'`Error H055`', 'Error H055: Got null request object.\n'+error);
-                if (!result.status || !result.status != 2) return logErrorSafeReply(interaction, commentErrorReply+'`Error H056`', 'Error H056: Invalid ticket status.\n'+error);
+                if (!result) return logErrorSafeReply(interaction, editErrorReply+'`Error H055`', 'Error H055: Got null request object.\n'+error);
+                if (!result.status || !result.status != 2) return logErrorSafeReply(interaction, editErrorReply+'`Error H056`', 'Error H056: Invalid ticket status.\n'+error);
                 db.setStatus(id, interaction.user.id, 3).then(() => {
                     result.status = 3;
                     fetchTicketMessage(client, result.messageid).then(ticket => {
@@ -108,8 +109,8 @@ function Hooks(client) {
                     interaction.message.edit({embeds:[generateDmRequestEmbed(result)],components:generateDmRequestAction(id)}).then(() => {
                         return interaction.reply({content:'Your ticket is now being edited.', ephemeral:true});
                     }).catch(error => console.log('Error H059: Failed edit response message.\n'+error));
-                }).catch(error => logErrorSafeReply(interaction, commentErrorReply+'`Error H057`', 'Error H057: Failed to set status.\n'+error));
-            }).catch(error => logErrorSafeReply(interaction, commentErrorReply+'`Error H054`', 'Error H054: Failed to get ticket.\n'+error));
+                }).catch(error => logErrorSafeReply(interaction, editErrorReply+'`Error H057`', 'Error H057: Failed to set status.\n'+error));
+            }).catch(error => logErrorSafeReply(interaction, editErrorReply+'`Error H054`', 'Error H054: Failed to get ticket.\n'+error));
         } else if (interaction.customId.includes('CancelTicket')) {
             cancelTicket(interaction);
         }
@@ -129,7 +130,7 @@ function openTicket(interaction) { //  I think this control flow is good for now
                     var ticketid = result.ticketid;
                     const response = await fetchTicketResponse(interaction.client, result.userid, result.responseid).catch(error => console.log('Error H063: Failed to fetch ticket response.\n'+error));
                     if (response) await response.edit({embeds:[generateDmReplacedEmbed()],components:[]}).catch(error => console.log('Error H064: Failed to edit ticket response.\n'+error));
-                    if (result.status == 1) await db.resetRequest(ticketid, interaction.user.id).catch(error => console.log('Error H065: Failed to reset ticket request.\n'+error));
+                    if (result.status == 1) await db.resetRequest(ticketid, interaction.user.id, message.id).catch(error => console.log('Error H065: Failed to reset ticket request.\n'+error));
                 } else {
                     result = {status:1};
                     var ticketid = await db.createRequest(interaction.user, message.id).catch(error => logErrorSafeReply(interaction, openTicketError+'`Error H066`', 'Error H066: Failed to create request.\n'+error));
@@ -152,14 +153,14 @@ function submitTicket(interaction) {
         if (!result.type) return interaction.reply({content:'Please set an appeal type.', ephemeral:true});
         if (!result.comment) return interaction.reply({content:'Please send a message via the message bar below and tell us how we can help you. (Max 500 Characters)', ephemeral:true});
         result.status = 2;
-        fetchTicketChannel(interaction.client).then(channel => {
-            db.submitTicket(id, interaction.user.id, ticket.id).then(async () => {
-                if (result.messageid) {
-                    var ticket = await channel.messages.fetch(result.messageid).catch(error => console.log('Error H074: Failed to fetch ticket message.\n'+error));
-                    await ticket.edit({embeds:[generateTicketEmbed(result)],components:generateTicketAction(id)}).catch(error => console.log('Error H075: Failed to edit ticket message.\n'+error));
-                } else {
-                    var ticket = await channel.send({embeds:[generateTicketEmbed(result)],components:generateTicketAction(id)}).catch(error => console.log('Error H076: Failed to send ticket message.\n'+error));
-                }       
+        fetchTicketChannel(interaction.client).then(async channel => {
+            if (result.messageid) {
+                var ticket = await channel.messages.fetch(result.messageid).catch(error => console.log('Error H074: Failed to fetch ticket message.\n'+error));
+                await ticket.edit({embeds:[generateTicketEmbed(result)],components:generateTicketAction(id)}).catch(error => console.log('Error H075: Failed to edit ticket message.\n'+error));
+            } else {
+                var ticket = await channel.send({embeds:[generateTicketEmbed(result)],components:generateTicketAction(id)}).catch(error => console.log('Error H076: Failed to send ticket message.\n'+error));
+            }
+            db.submitTicket(id, interaction.user.id, ticket.id).then(() => {
                 interaction.message.edit({embeds:[generateDmSubmittedEmbed(result)],components:generateDmEditAction(id)}).catch(error => console.log('Error H077: Failed to edit response message.\n'+error));
                 interaction.reply({content:'Submitted ticket! A member of our mod team will review your request shortly.', ephemeral:true}).catch(error => console.log('Error H078: Failed to send reply.\n'+error));
             }).catch(error => logErrorSafeReply(interaction, submitTicketError+'`Error H073`', 'Error H073: Failed to submit ticket.\n'+error));
@@ -282,13 +283,15 @@ function resolveTicketInteraction (interaction, status) {
             } else {
                 var author = 'moderator'  
             }
-            interaction.message.edit({embeds:[generateTicketResolvedEmbed(result, author)],components:[]}).catch(error => logErrorReply(interaction, 'Error H031: Failed to edit ticket embed\n', error));
-            db.deleteTicket(id).catch(error => logErrorReply(interaction, 'Error H018: Failed to delete ticket ' + id + '\n', error));
-            fetchTicketResponse(interaction.client, result.userid, result.responseid).then(response => {
-                if (!response) return logErrorReply(interaction, 'Error H020: Failed to fetch ticket response\n');
-                response.delete().catch(error => logErrorReply(interaction, 'Error H021: Failed to delete response\n', error));
-            }).catch(error => logErrorReply(interaction, 'Error H019: Failed to fetch ticket response\n', error));
-            response.channel.send({embeds:[generateDmResolvedEmbed(result)],components:[]}).catch(error => logErrorReply(interaction, 'Error H022: Failed to send resolution message\n', error));
+           
+            db.deleteTicket(id).then(() => {
+                interaction.message.edit({embeds:[generateTicketResolvedEmbed(result, author)],components:[]}).catch(error => logErrorReply(interaction, 'Error H031: Failed to edit ticket embed\n', error));
+                fetchTicketResponse(interaction.client, result.userid, result.responseid).then(response => {
+                    if (!response) return logErrorReply(interaction, 'Error H020: Failed to fetch ticket response\n');
+                    response.channel.send({embeds:[generateDmResolvedEmbed(result)],components:[]}).catch(error => logErrorReply(interaction, 'Error H022: Failed to send resolution message\n', error));
+                    response.delete().catch(error => logErrorReply(interaction, 'Error H021: Failed to delete response\n', error));
+                }).catch(error => logErrorReply(interaction, 'Error H019: Failed to fetch ticket response\n', error));
+            }).catch(error => logErrorReply(interaction, 'Error H018: Failed to delete ticket ' + id + '\n', error)); 
         }).catch(error => logErrorReply(interaction, 'Error H017: Ticket doesn\'t exist.\n', error));
     });
 }
