@@ -248,8 +248,6 @@ function generateTicketAction(id) {
 
 
 module.exports = {
-    getTestEmbed,
-    getTestEmbed2,
     getContactEmbed,
     generateDmRequestEmbed,
     generateDmSubmittedEmbed,
