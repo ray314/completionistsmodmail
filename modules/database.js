@@ -12,9 +12,9 @@ function isOwner(ticketid, userid) {
     return new Promise((resolve, reject) => {
         db.get('SELECT 1 FROM TICKETS WHERE ticketid=? AND userid=?', [ticketid, userid], function(err, result) {
             if (result) {
-                resolve();
+                resolve(true);
             } else {
-                reject('INVALID_USER');
+                reject(err);
             }
         });
     });
@@ -51,7 +51,7 @@ module.exports = {
                 if (result) {
                     return resolve(result);
                 } else {
-                    return resolve(false);
+                    return reject(err);
                 }
             });
         });
@@ -62,7 +62,7 @@ module.exports = {
                 if (result) {
                     return resolve(result);
                 } else {
-                    return resolve(false);
+                    return reject(err);
                 }
             });
         });
@@ -73,7 +73,7 @@ module.exports = {
                 if (result) {
                     return resolve(result);
                 } else {
-                    return resolve(false);
+                    return reject(err);
                 }
             });
         });
@@ -83,7 +83,7 @@ module.exports = {
             isOwner(ticketid, userid).then(() => {
                 db.run('UPDATE TICKETS SET status=? WHERE ticketid=?', [status, ticketid], function(err) {
                     if (err) {
-                        return reject('NO_TICKET');
+                        return reject(err);
                     }
                     return resolve();
                 });
@@ -95,7 +95,7 @@ module.exports = {
             isOwner(ticketid, userid).then(() => {
                 db.run('UPDATE TICKETS SET type=? WHERE ticketid=?', [type, ticketid], function(err) {
                     if (err) {
-                        return reject('NO_TICKET');
+                        return reject(err);
                     }
                     return resolve();
                 });
@@ -107,7 +107,7 @@ module.exports = {
             isOwner(ticketid, userid).then(() => {
                 db.run('UPDATE TICKETS SET comment=? WHERE ticketid=?', [comment, ticketid], function(err) {
                     if (err) {
-                        return reject('NO_TICKET');
+                        return reject(err);
                     }
                     return resolve();
                 });
@@ -119,7 +119,7 @@ module.exports = {
             isOwner(ticketid, userid).then(() => {
                 db.run('UPDATE TICKETS SET responseid=? WHERE ticketid=?', [responseid, ticketid], function(err) {
                     if (err) {
-                        return reject('NO_TICKET');
+                        return reject(err);
                     }
                     return resolve();
                 });
@@ -131,7 +131,7 @@ module.exports = {
             isOwner(ticketid, userid).then(() => {
                 db.run('UPDATE TICKETS SET responseid=? WHERE ticketid=?', [responseid, ticketid], function(err) {
                     if (err) {
-                        return reject('NO_TICKET');
+                        return reject(err);
                     }
                     return resolve();
                 });
@@ -143,7 +143,7 @@ module.exports = {
             isOwner(ticketid, userid).then(() => {
                 db.run('UPDATE TICKETS SET status=2, messageid=?, expire=0 WHERE ticketid=?', [messageid, ticketid], function(err) {
                     if (err) {
-                        return reject('NO_TICKET');
+                        return reject(err);
                     }
                     return resolve();
                 });
@@ -163,7 +163,11 @@ module.exports = {
     deleteTicket: function(ticketid) {
         return new Promise((resolve) => {
             db.run('DELETE FROM TICKETS WHERE ticketid=?', [ticketid], function(err) {
-                resolve();
+                if (err) {
+                    return reject(err);
+                } else {
+                    return resolve();
+                }
             });
         });
     },
@@ -173,7 +177,7 @@ module.exports = {
                 if (err) {
                     db.run('UPDATE BLOCKED SET expire=? WHERE userid=?', [expire,userid], function(err) {
                         if (err) {
-                            return reject();
+                            return reject(err);
                         }
                         return resolve();
                     });
@@ -186,13 +190,19 @@ module.exports = {
     isBlocked: function(userid) {
         return new Promise((resolve) => {
             db.get('SELECT 1 FROM BLOCKED WHERE userid=?', [userid], function(err, result) {
-                resolve(result);
+                if (result) {
+                    resolve(result);
+                }
+                resolve(false);
             });
         });
     },
     unblockUser: function(userid) {
         return new Promise((resolve) => {
             db.run('DELETE FROM BLOCKED WHERE userid=?', [userid], function(err) {
+                if (err) {
+                    reject(err);
+                }
                 resolve();
             });
         });
@@ -201,7 +211,11 @@ module.exports = {
         const time = new Date().getTime();
         return new Promise((resolve) => {
             db.all('SELECT * FROM TICKETS WHERE status=1 AND expire<=? AND expire!=0', [time], function(err, rows) {
-                resolve(rows);
+                if (rows) {
+                    resolve(rows);
+                } else {
+                    reject(err);
+                }
             });
         });
     },
@@ -209,7 +223,11 @@ module.exports = {
         const time = new Date().getTime();
         return new Promise((resolve) => {
             db.all('SELECT * FROM BLOCKED WHERE expire<=? AND expire!=0', [time], function(err, rows) {
-                resolve(rows);
+                if (rows) {
+                    resolve(rows);
+                } else {
+                    reject(err);
+                }
             });
         });
     },

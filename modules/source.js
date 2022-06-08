@@ -1,4 +1,4 @@
-const { MessageEmbed, MessageActionRow, MessageButton, MessageSelectMenu, TextInputComponent, Message} = require('discord.js');
+const { MessageEmbed, MessageActionRow, MessageButton, MessageSelectMenu } = require('discord.js');
 
 const intToStatus = {
     1: "REQUESTED",
@@ -21,7 +21,36 @@ const statusToInt = {
     "CLOSED": 8
 };
 
-// -- EMBEDS -- \\
+
+
+// -- EMBEDS -- \\\
+function getTestEmbed() {
+    return new MessageEmbed()
+    .setAuthor({name: 'mitsukeni' + '\u2003'.repeat(27), iconURL: 'https://images-ext-1.discordapp.net/external/4UvUlktBxkjyKMahZLNcqRIdgIsnEWqHhg0gIeHd69s/https/cdn.discordapp.com/avatars/306478889306423296/7c426685550a812a0a631f5e8ff2889d.webp'})
+    .setColor('#e3b314')
+    .setTitle('Ban Appeal')
+    .setDescription('unban me pls')
+    .setThumbnail('https://media.discordapp.net/attachments/983585037813416007/983587855815307354/pending.png')
+    .setFooter({text:'132'})
+    .setTimestamp();
+}
+
+function getTestEmbed2() {
+    return new MessageEmbed()
+    .setAuthor({name: 'mitsukeni' + '\u2003'.repeat(27), iconURL: 'https://images-ext-1.discordapp.net/external/4UvUlktBxkjyKMahZLNcqRIdgIsnEWqHhg0gIeHd69s/https/cdn.discordapp.com/avatars/306478889306423296/7c426685550a812a0a631f5e8ff2889d.webp'})
+    .setColor('#3DDB3D')
+    .setTitle('Ban Appeal')
+    .setDescription('unban me pls')
+    .setThumbnail('https://media.discordapp.net/attachments/983585037813416007/983589279693426718/pending.png')
+    .addFields(
+        { name: '\u200B', value: '\u200B' },
+        { name: 'Accepted by mitsukeni', value: 'Stop spamming \'sussy balls\' in chat'}  
+    )
+    .setFooter({text:'132'})
+    .setTimestamp();
+}
+
+
 function getContactEmbed() {
     return new MessageEmbed()
     .setColor('#d6b3f2')
@@ -170,18 +199,18 @@ function generateDmEditAction(id) {
     ];
 }
 
-function generateTicketAction() {
+function generateTicketAction(id) {
     return [ new MessageActionRow().addComponents(
         new MessageButton()
-            .setCustomId('ResolveTicket-')
+            .setCustomId('ResolveTicket-'+id)
             .setLabel('Resolve')
             .setStyle('PRIMARY'),
         new MessageButton()
-            .setCustomId('AcceptTicket-')
+            .setCustomId('AcceptTicket-'+id)
             .setLabel('Accept')
             .setStyle('SUCCESS'),
         new MessageButton()
-            .setCustomId('DenyTicket-')
+            .setCustomId('DenyTicket-'+id)
             .setLabel('Deny')
             .setStyle('DANGER')
     )];
@@ -189,6 +218,8 @@ function generateTicketAction() {
 
 
 module.exports = {
+    getTestEmbed,
+    getTestEmbed2,
     getContactEmbed,
     generateDmRequestEmbed,
     generateDmSubmittedEmbed,
