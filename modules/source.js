@@ -57,7 +57,7 @@ function generateDmRequestEmbed(params) {
     let title = params.status == 3 ? 'Editing Ticket' : 'Ticket Request';
     var status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
     if (!params.type) params.type = 'Please set type';
-    if (!params.comment) params.comment = 'Enter your comment via the message bar (Max: 500)';
+    if (!params.comment) params.comment = 'Enter your comment via the message bar (Max: 500 Characters)';
     return new MessageEmbed()
         .setTitle(title)
         .setColor(statusToColor[status])
@@ -71,8 +71,8 @@ function generateDmRequestEmbed(params) {
 
 function generateDmSubmittedEmbed(params) {
     var status = params.status ? intToStatus[params.status] : 'UNKNOWN'; 
-    if (!params.type) params.type = 'Please set type';
-    if (!params.comment) params.comment = 'Enter your comment via the message bar (Max: 500)'; 
+    if (!params.type) params.type = 'UNKNOWN';
+    if (!params.comment) params.comment = 'UNKNOWN'; 
     return new MessageEmbed()
         .setTitle(params.type)
         .setColor(statusToColor[status])
@@ -103,25 +103,25 @@ function generateDmResolvedEmbed(params) {
 
 function generateDmExpiredEmbed() {
     return new MessageEmbed()
-    .setColor('#d6b3f2')
+    .setColor(statusToColor.Closed)
     .setDescription('*ticket request has expired*');
 }
 
 function generateDmReplacedEmbed() {
     return new MessageEmbed()
-    .setColor('#d6b3f2')
+    .setColor(statusToColor.Closed)
     .setDescription('*ticket was cancelled by another ticket*');
 }
 
 function generateDmCancelledEmbed() {
     return new MessageEmbed()
-    .setColor('#d6b3f2')
+    .setColor(statusToColor.Cancelled)
     .setDescription('*ticket was cancelled*');
 }
 
 function generateDmBlockedEmbed() {
     return new MessageEmbed()
-    .setColor('#d6b3f2')
+    .setColor(statusToColor.Closed)
     .setDescription('*you are blocked from creating new tickets*');
 }
 
@@ -149,12 +149,6 @@ function generateTicketEmbed(params) {
         .setTimestamp();
 }
 
-function generateTicketEditingEmbed() {
-    return new MessageEmbed()
-    .setColor(statusToColor.Editing)
-    .setDescription('*ticket is currently being edited*');
-}
-
 function generateTicketResolvedEmbed(params, author) {
     if (!params.ticketid) return;
     if (!params.name) params.name = params.userid ? "ID: " + params.userid : "UNKNOWN";
@@ -179,7 +173,7 @@ function generateTicketResolvedEmbed(params, author) {
 function generateTicketClosedEmbed(params) {
     if (!params.user) params.user = 'moderator';
     let desc = '*ticket forcefully closed by ' + params.user + '*';
-    if (params.remarks) desc += '"\n' + params.remarks + '"';
+    if (params.remarks) desc += '\n"' + params.remarks + '"';
     return new MessageEmbed()
     .setColor(statusToColor.Closed)
     .setDescription(desc);
@@ -257,7 +251,6 @@ module.exports = {
     generateDmBlockedEmbed,
     generateDmClosedEmbed,
     generateTicketEmbed,
-    generateTicketEditingEmbed,
     generateTicketResolvedEmbed,
     generateTicketClosedEmbed,
     getContactAction,
