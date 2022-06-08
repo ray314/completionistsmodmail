@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 const config = require('../config.json');
 //const config = require('../testing-config.json');
+=======
+//const config = require('../config.json');
+const config = require('../testing-config.json');
+>>>>>>> 6818325d057473bed382db077a0118476481324c
 const { getContactEmbed, generateDmRequestEmbed, generateDmSubmittedEmbed, generateDmExpiredEmbed, generateDmReplacedEmbed, generateDmBlockedEmbed, generateTicketResolvedEmbed, generateDmClosedEmbed, getContactAction, generateDmRequestAction, generateDmEditAction, generateTicketEmbed, generateTicketAction, generateDmResolvedEmbed, generateTicketClosedEmbed } = require('./source.js');
 const db = require('./database.js');
 
