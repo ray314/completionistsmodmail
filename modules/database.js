@@ -22,7 +22,7 @@ module.exports = {
     isOwner,
     createRequest: function(user, responseid) {
         return new Promise((resolve, reject) => {
-            db.run('INSERT INTO TICKETS (userid,name,iconurl,status,responseid,expire) VALUES(?,?,?,1,?,?)', [user.id, user.username, user.displayAvatarURL(), responseid, new Date().getTime()+(EXPIRE*3600000)], function(err) {
+            db.run('INSERT INTO TICKETS (userid,name,iconurl,status,responseid,expire) VALUES(?,?,?,1,?,?)', [user.id, user.username, user.displayAvatarURL(), responseid, new Date().getTime()+(EXPIRE*3600000)], function(err) { //3600000
                 if (err) {
                     return reject(err);
                 }
@@ -171,9 +171,9 @@ module.exports = {
     },
     blockUser: function(userid, expire) {
         return new Promise((resolve, reject) => {
-            db.run('INSERT INTO BLOCKED(userid,expire) VALUES(?,?)', [userid, expire], function(err) {
+            db.run('INSERT INTO BLOCKED(userid,expire) VALUES(?,?)', [userid, new Date().getTime()+(expire*3600000)], function(err) {
                 if (err) {
-                    db.run('UPDATE BLOCKED SET expire=? WHERE userid=?', [expire,userid], function(err) {
+                    db.run('UPDATE BLOCKED SET expire=? WHERE userid=?', [new Date().getTime()+(expire*3600000),userid], function(err) {
                         if (err) {
                             return reject(err);
                         }
