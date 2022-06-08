@@ -1,6 +1,6 @@
-//const config = require('../config.json');
-const config = require('../testing-config.json');
-const { getTestEmbed,getTestEmbed2, getContactEmbed, generateDmRequestEmbed, generateDmSubmittedEmbed, generateDmExpiredEmbed, generateDmReplacedEmbed, generateDmBlockedEmbed, generateTicketEditingEmbed, generateTicketResolvedEmbed, generateDmClosedEmbed, getContactAction, generateDmRequestAction, generateDmEditAction, generateTicketEmbed, generateTicketAction, generateDmResolvedEmbed, generateTicketClosedEmbed } = require('./source.js');
+const config = require('../config.json');
+//const config = require('../testing-config.json');
+const { getContactEmbed, generateDmRequestEmbed, generateDmSubmittedEmbed, generateDmExpiredEmbed, generateDmReplacedEmbed, generateDmBlockedEmbed, generateTicketEditingEmbed, generateTicketResolvedEmbed, generateDmClosedEmbed, getContactAction, generateDmRequestAction, generateDmEditAction, generateTicketEmbed, generateTicketAction, generateDmResolvedEmbed, generateTicketClosedEmbed } = require('./source.js');
 const db = require('./database.js');
 
 function Hooks(client) {
@@ -13,12 +13,6 @@ function Hooks(client) {
         if (content.substring(0, 1) === '.') {
         const command = content.split(' ');
             switch(command[0]) {
-                case '.test':
-                    message.channel.send({embeds:[getTestEmbed()]});
-                    break;
-                case '.test2':
-                    message.channel.send({embeds:[getTestEmbed2()]});
-                    break;
                 case '.sendcontact':
                     sendSupportContact(message);
                     break;

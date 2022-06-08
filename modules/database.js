@@ -1,6 +1,4 @@
-const { generateDmExpiredEmbed } = require('./source');
-
-const EXPIRE = 72 // time in hours before a requested ticket expires or a resolved ticket can no longer be reopened. should probably be moved to config
+const EXPIRE = 1 // time in hours before a requested ticket expires or a resolved ticket can no longer be reopened. should probably be moved to config
 
 const sqlite3 = require('sqlite3').verbose();
 var db = new sqlite3.Database('./database/tickets.db');
@@ -24,7 +22,7 @@ module.exports = {
     isOwner,
     createRequest: function(user, responseid) {
         return new Promise((resolve, reject) => {
-            db.run('INSERT INTO TICKETS (userid,name,iconurl,status,responseid,expire) VALUES(?,?,?,1,?,?)', [user.id, user.username, user.displayAvatarURL(), responseid, new Date().getTime()+(72*3600000)], function(err) {
+            db.run('INSERT INTO TICKETS (userid,name,iconurl,status,responseid,expire) VALUES(?,?,?,1,?,?)', [user.id, user.username, user.displayAvatarURL(), responseid, new Date().getTime()+(EXPIRE*3600000)], function(err) {
                 if (err) {
                     return reject(err);
                 }
@@ -36,7 +34,7 @@ module.exports = {
     resetRequest: function(ticketid, userid) {
         return new Promise((resolve, reject) => {
             isOwner(ticketid, userid).then(() => {
-                db.run('UPDATE TICKETS SET status=1, type=NULL, comment=NULL, remarks=NULL, messageid=NULL, responseid=NULL, expire=? WHERE ticketid=?', [new Date().getTime()+(72*3600000), ticketid], function(err) {
+                db.run('UPDATE TICKETS SET status=1, type=NULL, comment=NULL, remarks=NULL, messageid=NULL, responseid=NULL, expire=? WHERE ticketid=?', [new Date().getTime()+(EXPIRE*3600000), ticketid], function(err) {
                     if (err) {
                         return reject(err);
                     }

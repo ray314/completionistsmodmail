@@ -47,31 +47,6 @@ const statusToColor = {
 
 
 // -- EMBEDS -- \\\
-function getTestEmbed() {
-    return new MessageEmbed()
-    .setAuthor({name: 'mitsukeni' + '\u2003'.repeat(27), iconURL: 'https://images-ext-1.discordapp.net/external/4UvUlktBxkjyKMahZLNcqRIdgIsnEWqHhg0gIeHd69s/https/cdn.discordapp.com/avatars/306478889306423296/7c426685550a812a0a631f5e8ff2889d.webp'})
-    .setColor('#e3b314')
-    .setTitle('Ban Appeal')
-    .setThumbnail('https://cdn.discordapp.com/attachments/911896251266633778/981708663083388939/FUK2Ua0aMAExC4M.mp4')
-    .setFooter({text:'132'})
-    .setTimestamp();
-}
-
-function getTestEmbed2() {
-    return new MessageEmbed()
-    .setAuthor({name: 'mitsukeni' + '\u2003'.repeat(27), iconURL: 'https://images-ext-1.discordapp.net/external/4UvUlktBxkjyKMahZLNcqRIdgIsnEWqHhg0gIeHd69s/https/cdn.discordapp.com/avatars/306478889306423296/7c426685550a812a0a631f5e8ff2889d.webp'})
-    .setColor('#3DDB3D')
-    .setTitle('Ban Appeal')
-    .setThumbnail('https://media.discordapp.net/attachments/983585037813416007/983589279693426718/pending.png')
-    .addFields(
-        { name: '\u200B', value: '\u200B' },
-        { name: 'Accepted by mitsukeni', value: 'Stop spamming \'sussy balls\' in chat'}  
-    )
-    .setFooter({text:'132'})
-    .setTimestamp();
-}
-
-
 function getContactEmbed() {
     return new MessageEmbed()
     .setColor('#5865F2')

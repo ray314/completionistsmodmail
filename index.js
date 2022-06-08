@@ -12,7 +12,7 @@ partials: [
 ] });
 
 client.once('ready', () => {
-    //console.log(`Logged in as ${client.user.tag}!`);
+    console.log(`Logged in as ${client.user.tag}!`);
     client.user.setActivity('minecraft ost', { type: 'LISTENING' });
     Hooks(client);
 });
