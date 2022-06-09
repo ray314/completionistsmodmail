@@ -340,7 +340,7 @@ function unblockUser (message) {
     isValid(message, message.author).then(valid => {
         if (!valid) return;
         var userid = parseMentionOrUser(message)
-        if (!userid) return message.reply('Could not identify user. `.unblock [mention|user_id]');
+        if (!userid) return message.reply('Could not identify user. `.unblock [mention|user_id]`');
         db.unblockUser(userid).then(() => {
             return message.react('✅');
         }).catch(error => logErrorReact(message, 'H026: Failed to unblock user.\n' + error));
@@ -537,7 +537,7 @@ function parseMentionOrUser(message) {
     try {
         var userid = message.mentions.users.firstKey();
         if (!userid) {
-            return message.content.match(/(?<=^\.block+\s)([0-9]+)/g);
+            return message.content.match(/(?<=^\.\S+\s)([0-9]+)/g);
         } else {
             return userid;
         }
