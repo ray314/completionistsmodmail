@@ -16,7 +16,7 @@ partials: [
 
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
-    client.user.setActivity('minecraft ost', { type: 'LISTENING' });
+    client.user.setActivity('Bald eagle', { type: 'LISTENING' });
     Hooks(client);
 });
 
