@@ -1,7 +1,7 @@
 const EXPIRE = 1 // time in hours before a requested ticket expires or a resolved ticket can no longer be reopened. should probably be moved to config
 
 const sqlite3 = require('sqlite3').verbose();
-var db = new sqlite3.Database('./database/tickets.db');
+var db = new sqlite3.Database(path.join(__dirname, '/database/tickets.db'));
 db.run('CREATE TABLE IF NOT EXISTS TICKETS(ticketid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, userid TEXT NOT NULL, name TEXT, iconurl TEXT, status INTEGER NOT NULL, type TEXT, comment TEXT, remarks TEXT, messageid TEXT, responseid TEXT NOT NULL, expire INTEGER)');
 db.run('CREATE TABLE IF NOT EXISTS BLOCKED(userid TEXT PRIMARY KEY NOT NULL UNIQUE, expire INTEGER NOT NULL)');
 
