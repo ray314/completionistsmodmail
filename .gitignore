@@ -1,5 +1,4 @@
 node_modules/**
-database/**
 testing-config.json
 test-auth.json
 .env
