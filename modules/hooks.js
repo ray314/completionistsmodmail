@@ -19,6 +19,7 @@ function Hooks(client) {
                     break;
                 case '.sendcontact':
                     sendSupportContact(message);
+                    console.log("Test send contact");
                     break;
                 case '.updatecontact':
                     updateSupportContact(message);
@@ -441,9 +442,11 @@ function expiryTimeout(client) {
 // Sub Level Functions
 function isValid (interaction, user) {
     return new Promise((resolve) => {
+        console.log(config.SupportChannelID);
         if (interaction.member) {
             if (config.ModeratorRoleID.some((r) => interaction.member.roles.cache.has(r))) {
                 resolve(true);
+                console.log("valid role");
             } else {
                 resolve(false);
             }

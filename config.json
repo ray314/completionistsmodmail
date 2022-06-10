@@ -1,9 +1,9 @@
 {
-    "GuildID": "GUILD_ID",
-    "SupportChannelID": "SUPPORT_ID",
-    "TicketChannelID": "TICKET_ID",
+    "GuildID": "925159676193173534",
+    "SupportChannelID": "980753342533894164",
+    "TicketChannelID": "984357708851445780",
     "ModeratorRoleID": [
-        "ROLES_ID"
+        "925163038712135700","978744642273181817","925164302082662460"
     ],
     "Help" : "```asciidoc\n= General Commands =\n .modmail-help :: Displays this help screen\n .sendcontact :: Sends the support contact message to the support channel\n .updatecontact :: Scans for and updates the support contact message to the current configuration\n .block [mention|userID] [hours] :: Blocks a user from creating new requests\n .unblock [mention|userID] :: Unblocks a user from creating new requests\n\n= Ticket Handlers =\nMust be sent as a reply to a ticket\n .resolve [remarks] :: Resolves a ticket\n .accept [remarks] :: Accepts a ticket\n .deny [remarks] :: Denies a ticket\n .close [remarks] :: Closes a ticket (should only be used for illegal or corrupted tickets)\n```"
 }
