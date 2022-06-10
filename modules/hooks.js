@@ -19,7 +19,6 @@ function Hooks(client) {
                     break;
                 case '.sendcontact':
                     sendSupportContact(message);
-                    console.log("Test send contact");
                     break;
                 case '.updatecontact':
                     updateSupportContact(message);
@@ -446,7 +445,6 @@ function isValid (interaction, user) {
         if (interaction.member) {
             if (config.ModeratorRoleID.some((r) => interaction.member.roles.cache.has(r))) {
                 resolve(true);
-                console.log("valid role");
             } else {
                 resolve(false);
             }
