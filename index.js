@@ -1,14 +1,14 @@
 require('dotenv').config();
-const { Intents, Client } = require("discord.js");
+const { IntentsBitField, Client, ActivityType } = require("discord.js");
 const { Hooks } = require('./modules/hooks.js');
 const express = require('express')
 const app = express()
 const PORT = process.env.PORT || 3000;
 
 const client = new Client({ intents: [
-    Intents.FLAGS.GUILDS, 
-    Intents.FLAGS.GUILD_MESSAGES,
-    Intents.FLAGS.DIRECT_MESSAGES
+    IntentsBitField.Flags.Guilds, 
+    IntentsBitField.Flags.GuildMessages,
+    IntentsBitField.Flags.DirectMessages
 ],
 partials: [
     'CHANNEL'
@@ -16,7 +16,11 @@ partials: [
 
 client.once('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
-    client.user.setActivity('bald eagle', { type: 'LISTENING' });
+    client.user.setPresence({
+        activities: [{ name: 'bald eagle', type: ActivityType.Listening}],
+        status: 'bald eagle'
+    })
+    //client.user.setActivity('bald eagle', { type: 'LISTENING' });
     Hooks(client);
 });
 
